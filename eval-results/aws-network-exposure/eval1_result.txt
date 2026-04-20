@@ -1,0 +1,1 @@
+1|What's exposed to the internet in my AWS account?|6|0|6|

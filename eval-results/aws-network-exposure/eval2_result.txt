@@ -1,0 +1,1 @@
+2|I found an open security group with 0.0.0.0/0 on port 22. Is that bad?|4|1|5|FAIL|Uses devil's advocate to challenge the exploitability assessment|Response does not explicitly challenge its own assessment; it leans toward "it's almost always a finding" without a structured devil's advocate counterargument\n

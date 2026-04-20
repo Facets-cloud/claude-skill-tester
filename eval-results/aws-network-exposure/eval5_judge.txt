@@ -1,0 +1,4 @@
+PASS|Detects EKS permission failure from preflight|Explicitly identifies eks:ListClusters/eks:DescribeCluster as missing permissions
+PASS|Informs user that K8s audit is skipped|Clearly states "K8s audit: unavailable" and "No K8s investigator will be spawned"
+PASS|Proceeds with AWS-only audit without failing|Continues with survey and investigator plan despite EKS being inaccessible
+PASS|Does NOT require K8s access to complete the audit|Only infra/data exposure investigators planned; K8s investigator explicitly excluded

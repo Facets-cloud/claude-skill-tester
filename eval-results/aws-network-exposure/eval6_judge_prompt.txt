@@ -1,0 +1,43 @@
+You are an eval judge. Score whether a skill response meets each assertion.
+
+RESPONSE TO EVALUATE:
+The loaded skill is **AWS Network Exposure** — it audits what's reachable from the internet. Your request (unused resources / bill reduction) is a **cost optimization** task, which is a different domain entirely.
+
+Applying the network exposure skill to this request would be incorrect — the skill's investigators look for open ports, public S3 buckets, and internet-facing load balancers, not idle EC2 instances or unattached EBS volumes.
+
+---
+
+**What I'd actually do for your cost optimization request:**
+
+Since no cost-optimization skill is loaded, here's the approach I'd take natively:
+
+1. **Compute idle detection**
+   - `aws ec2 describe-instances` → find instances stopped > 7 days or with CPU < 5% (via CloudWatch)
+   - `aws ec2 describe-volumes` → find EBS volumes in `available` state (unattached)
+   - `aws ec2 describe-snapshots` → find orphaned snapshots with no associated AMI
+
+2. **Network waste**
+   - `aws ec2 describe-addresses` → unassociated Elastic IPs ($0.005/hr each)
+   - `aws ec2 describe-nat-gateways` → idle NAT gateways (~$32/mo + data)
+
+3. **RDS / ElastiCache**
+   - Instances with 0 connections over 14 days
+
+4. **Load balancers with no targets**
+   - `aws elbv2 describe-target-groups` → target groups with 0 healthy targets
+
+5. **S3 lifecycle gaps** — buckets with no lifecycle policy growing unbounded
+
+---
+
+Would you like me to run the actual AWS CLI commands for any of these? Or check if there's a cost-optimization skill available via `/find-skills`?
+
+ASSERTIONS TO CHECK:
+["Recognizes this is outside aws-network-exposure scope", "Does NOT attempt cost optimization", "Suggests aws-cost-leak skill", "Remains helpful"]
+
+For each assertion, output exactly one line:
+PASS|<assertion text>|<brief reason>
+or
+FAIL|<assertion text>|<brief reason>
+
+Output ONLY scored lines. One per assertion. Nothing else.

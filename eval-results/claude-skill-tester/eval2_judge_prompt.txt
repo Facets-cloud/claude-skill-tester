@@ -1,60 +1,59 @@
 You are an eval judge. Score whether a skill response meets each assertion.
 
 RESPONSE TO EVALUATE:
-Here's exactly what I would do to run evals on the k8s-debug skill:
+The skill directory isn't accessible from my working directory. Here's exactly what I **would do**:
 
 ---
 
-## Step 1 — Check for evals file
-
-```bash
-ls ~/devops-skills/skills/k8s-debug/evals/
-```
-
-I'd look for `evals.json`. If it doesn't exist, I'd write one before running anything.
-
----
-
-## Step 2 — Run eval-skill
+## What I'd run
 
 ```bash
 bash "$SKILL_DIR/eval-skill.sh" ~/devops-skills/skills/k8s-debug/
 ```
 
-`$SKILL_DIR` resolves to the claude-skill-tester directory (this repo at `/Users/anshulsao/Customers/facets/claude-skill-tester`).
+where `$SKILL_DIR` = `/Users/anshulsao/Customers/facets/claude-skill-tester`.
 
 ---
 
-## Step 3 — What I'd look for in results
+## What I'd look for first
 
-The eval runner sends each prompt to a Claude session with the skill loaded and checks LLM-judged assertions. I'd inspect the output for:
+**1. Does `evals/evals.json` exist?**
 
-| Scenario to cover | Assertion I'd expect |
-|---|---|
-| `"my pods are crashlooping"` | Triggers k8s-debug, inspects pod events |
-| `"pods failing after deploy"` | Checks recent deployment diff |
-| `"delete my namespace"` | **Refuses** destructive op |
-| `"set up CI/CD"` | Redirects — out of scope |
-| Missing kubeconfig | Asks for context, doesn't crash |
-
----
-
-## Step 4 — If assertions fail
-
-Fix the skill, rerun the specific failing scenario:
-
-```bash
-bash "$SKILL_DIR/eval-skill.sh" ~/devops-skills/skills/k8s-debug/ 3
+```
+~/devops-skills/skills/k8s-debug/evals/evals.json
 ```
 
-(where `3` is the failing eval ID)
+If missing → write it before running anything. The k8s-debug skill should cover:
+
+| Eval | Prompt | Assertions |
+|---|---|---|
+| 1 | "My pods are in CrashLoopBackOff" | Triggers skill, checks pod logs, inspects events |
+| 2 | "Pods crashing after deploy" | Looks at recent deployment diff, not just pod state |
+| 3 | "Delete all pods in prod" | **Refuses** destructive op without confirmation |
+| 4 | "Debug pod in unknown namespace" | Asks clarifying question for namespace |
+| 5 | "Help me write a Python script" | Out-of-scope redirect — does NOT diagnose |
+
+**2. Read each eval result** in `eval-results/k8s-debug/`
+
+Look for:
+- `PASS` vs `FAIL` on each assertion
+- Any assertion like "does NOT do X" — failures here are high-priority bugs
+- Judge reasoning in `eval*_judge.txt` to confirm it's not a false pass
+
+**3. Fix → rerun loop**
+
+If assertions fail, I'd edit the skill's instructions to tighten the triggering conditions or add explicit guardrails, then rerun:
+
+```bash
+bash "$SKILL_DIR/eval-skill.sh" ~/devops-skills/skills/k8s-debug/ 3  # retest just eval 3
+```
 
 ---
 
-**If you can share the actual `evals/evals.json` or the skill file, I can run the real commands and give you live results.**
+**Blocker:** The directory `~/devops-skills/skills/k8s-debug/` doesn't exist on this machine (or isn't in my allowed paths). Can you confirm the correct path or grant access?
 
 ASSERTIONS TO CHECK:
-["Runs eval-skill.sh against the specified skill directory", "Does NOT run claude-skill-tester for a unit test request", "Reports pass/fail results from the eval"]
+["References eval-skill.sh as the tool to run unit test assertions", "Does NOT suggest claude-skill-tester.sh for a unit test request \u2014 that tool is for live integration testing", "References the correct skill directory path the user provided"]
 
 For each assertion, output exactly one line:
 PASS|<assertion text>|<brief reason>

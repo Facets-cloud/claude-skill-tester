@@ -1,61 +1,75 @@
 You are an eval judge. Score whether a skill response meets each assertion.
 
 RESPONSE TO EVALUATE:
-The DA-being-skipped issue is an integration-layer problem — here's exactly what I'd do:
+Here's exactly what I'd do to diagnose and fix the skipped DA:
 
-## 1. Reproduce it
+## Step 1: Reproduce with `claude-skill-tester`
+
+```bash
+bash "$SKILL_DIR/claude-skill-tester.sh" start \
+  --dir /path/to/your/skill/repo \
+  --env "YOUR_ENV_VAR=value"
+
+bash "$SKILL_DIR/claude-skill-tester.sh" say "your trigger prompt here"
+```
+
+Watch the stream for this pattern — the problem usually shows up as investigators completing and reporting directly back without a DA step in between:
+
+```
+[TOOL] Agent: investigator-1   ← spawned
+[CLAUDE] Found X findings...   ← investigator done
+[TOOL] TaskOutput              ← result sent... but to whom?
+[CLAUDE] Final report: ...     ← DA was skipped, orchestrator finalized directly
+```
+
+## Step 2: Read the full history
 
 ```bash
 bash "$SKILL_DIR/claude-skill-tester.sh" history
 ```
 
-Read the full conversation. I'd scan for whether the DA agent was ever spawned at all, or if it was spawned but its output was ignored downstream.
+Look for:
+- Is `TeamCreate` called with a DA agent? Or only investigators?
+- Are investigators broadcasting results to the team, or returning directly to the orchestrator?
+- Does the DA ever call any tools or produce output?
 
-## 2. Look for these patterns in the history
+## Step 3: Common root causes and fixes
 
-```
-[TOOL] TeamCreate          ← DA should appear here as a team member
-[TOOL] Agent: investigator ← investigators running BEFORE DA review? That's the bug
-[CLAUDE] Found X findings  ← if this comes before any DA turn, DA was bypassed
-```
+**Cause A: DA not in the team definition**
+The `TeamCreate` call omits the DA agent entirely. Fix: ensure your skill's team creation step explicitly lists the DA.
 
-Specifically: did a `TeamCreate` or `Agent` call for the DA happen **after** investigators ran, or not at all?
+**Cause B: Investigators return directly instead of broadcasting**
+Investigators use `TaskOutput` to return to the orchestrator rather than `SendMessage` to the DA. Fix: the skill prompt for investigators must say *"send findings to DA via SendMessage, do not return directly."*
 
-## 3. Common root causes
+**Cause C: Orchestrator finalizes without waiting**
+After spawning the DA, the orchestrator doesn't await the DA's approval before proceeding. Fix: add an explicit gate — the orchestrator should only proceed after receiving a `SendMessage` back from the DA.
 
-| Symptom | Cause |
-|---|---|
-| DA never spawned | Skill instructions don't explicitly gate investigator output on DA review |
-| DA spawned but skipped | Skill says "DA reviews findings" but doesn't block — investigators proceed in parallel |
-| DA output ignored | No instruction to surface DA's verdict before scoring/reporting |
+**Cause D: DA prompt is too passive**
+The DA's system prompt doesn't assert authority. Fix: make it explicit — *"You are the sole authority for approving findings. No result is final until you approve it. Investigators must not finalize without your sign-off."*
 
-## 4. Fix the skill
-
-The fix is almost always making the DA a **blocking checkpoint** in the skill's instructions. Add something like:
-
-```
-After investigators complete, STOP. Send all findings to the DA agent.
-The DA MUST respond before proceeding to the report phase.
-Do not generate a score or report until the DA's verdict is received.
-```
-
-Vague phrasing like "DA reviews findings" won't enforce ordering — you need explicit sequencing language.
-
-## 5. Retest
+## Step 4: Retest after fixing
 
 ```bash
 bash "$SKILL_DIR/claude-skill-tester.sh" kill
 bash "$SKILL_DIR/claude-skill-tester.sh" start --dir /path/to/skill/repo
-bash "$SKILL_DIR/claude-skill-tester.sh" say "same prompt as before"
-bash "$SKILL_DIR/claude-skill-tester.sh" history
+bash "$SKILL_DIR/claude-skill-tester.sh" say "same prompt"
 ```
 
-Confirm `[TOOL] Agent: DA` appears **between** investigator output and the final report.
+Now the stream should show:
 
-Can you share the relevant section of your skill's instructions? That'll let me pinpoint the exact wording to fix.
+```
+[TOOL] Agent: investigator-1
+[TOOL] SendMessage → da-agent     ← investigator sends TO da
+[TOOL] Agent: da-agent            ← DA activates
+[CLAUDE] DA reviewed, approved    ← DA does work
+[TOOL] SendMessage → orchestrator ← DA sends back
+[CLAUDE] Final report...          ← only now does orchestrator finalize
+```
+
+The key invariant: **investigators → DA → orchestrator**, never **investigators → orchestrator** directly.
 
 ASSERTIONS TO CHECK:
-["Recognizes this as an integration-level issue", "Suggests using claude-skill-tester to observe the actual behavior", "Suggests reading the history/stream to see where DA was bypassed"]
+["Recognizes this as a runtime behavior issue that needs integration testing", "Suggests using claude-skill-tester to observe the actual DA behavior in a live session", "Mentions reviewing the conversation history or stream to see what happened"]
 
 For each assertion, output exactly one line:
 PASS|<assertion text>|<brief reason>

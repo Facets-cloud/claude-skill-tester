@@ -1,14 +1,7 @@
-The flow commands are blocked in this context. The loaded skill is **Skill Tester**, which is about testing and improving Claude Code skills — not deploying applications.
+This request is out of scope for the **Skill Tester** skill, which is specifically for testing and improving Claude Code skills — not for deploying applications.
 
----
+To deploy your application to production, I'd need more context:
+- What platform/infrastructure? (AWS, GCP, Kubernetes, Facets, etc.)
+- What's the deployment mechanism? (CI/CD pipeline, CLI, Terraform, etc.)
 
-**"Deploy my application to production"** is out of scope for this skill.
-
-The Skill Tester skill handles:
-- Unit testing skills with `eval-skill`
-- Integration testing skills with `claude-skill-tester`
-- Analyzing skill failures and improving skill logic
-
-For deploying to production, you'd want a different skill or tool — for example, the `facets-blueprint` skill if you're deploying via Facets, or your team's standard deployment runbook.
-
-Would you like me to help you **test a skill**, or were you looking for deployment help?
+Let me know those details and I can help.

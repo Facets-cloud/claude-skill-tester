@@ -1,0 +1,60 @@
+This falls within the K8s exposure investigator's scope (images from public registries). Here's exactly what I would do:
+
+## Investigation: Pods Pulling from DockerHub vs ECR
+
+### Step 1: Get all pod images across all namespaces
+
+```bash
+kubectl get pods --all-namespaces \
+  -o jsonpath='{range .items[*]}{.metadata.namespace}{"\t"}{.metadata.name}{"\t"}{range .spec.containers[*]}{.image}{"\n"}{end}{end}'
+```
+
+Also check `initContainers`:
+```bash
+kubectl get pods --all-namespaces \
+  -o jsonpath='{range .items[*]}{.metadata.namespace}{"\t"}{.metadata.name}{"\t"}{range .spec.initContainers[*]}{.image}{"\n"}{end}{end}'
+```
+
+### Step 2: Filter for non-ECR images
+
+ECR images follow the pattern: `<account_id>.dkr.ecr.<region>.amazonaws.com/<repo>:<tag>`
+
+Any image **not** matching that prefix is from a public registry. I'd filter:
+
+```bash
+# Pipe above output through grep -v to exclude ECR
+grep -v '\.dkr\.ecr\.'
+```
+
+### What I'd Look For
+
+| Image pattern | Registry | Risk |
+|---|---|---|
+| `nginx:latest` | DockerHub | Medium |
+| `docker.io/library/redis:7` | DockerHub | Medium |
+| `gcr.io/google-containers/...` | GCR | Low-Medium |
+| `quay.io/...` | Quay | Low-Medium |
+| `<acct>.dkr.ecr.<region>.amazonaws.com/...` | ECR | Safe |
+
+### Step 3: Assess risk per image
+
+For each non-ECR image found, I'd check:
+- Is it a well-known official image (`nginx`, `redis`, `postgres`)? Lower risk but still unscanned.
+- Is it a random org's image (`somevendor/tool`)? Higher supply chain risk.
+- Is `latest` tag used? **Always a finding** — no pinning = unpredictable image content.
+
+### Step 4: Cross-reference with ECR
+
+```bash
+aws ecr describe-repositories --region <region> --query 'repositories[*].repositoryName'
+```
+
+This tells me whether equivalent ECR mirrors exist that teams *could* be using but aren't.
+
+---
+
+**What I'd send to the devil's advocate:**
+
+> "Found X pods pulling from DockerHub across Y namespaces. These images are not scanned by ECR's image scanning and are pulled over the internet at runtime. Notable: `someimage:latest` tag is unpinned — the image content can change without any deployment change. No ECR mirrors exist for these images. Risk: supply chain compromise, image drift, inability to enforce image scanning policy."
+
+**DA would likely CONFIRM** if unpinned `latest` tags or unknown vendor images are present, and assess it as **Medium → High** depending on whether the workload has cluster-admin RBAC (which amplifies blast radius).

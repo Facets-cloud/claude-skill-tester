@@ -1,3 +1,3 @@
-FAIL|Identifies that the skill needs to be tested|Response is an error message with no content about skill testing
-FAIL|Decides whether to run unit tests (eval-skill) or integration tests (claude-skill-tester) or both|Response is an error message with no decision made
-FAIL|Asks the user for context if unclear — which skill directory, does it need real infra?|Response is an error message, no questions were asked
+PASS|Mentions eval-skill or unit testing as a first step|Explicitly calls out eval-skill as "Step 1: Unit tests first"
+PASS|Mentions claude-skill-tester or integration testing as a follow-up step|Explicitly calls out claude-skill-tester as "Step 2: Integration test"
+PASS|Explains the difference between unit tests and integration tests for skills|Unit tests check assertions via evals.json; integration tests run real prompts and watch actual tool calls/output

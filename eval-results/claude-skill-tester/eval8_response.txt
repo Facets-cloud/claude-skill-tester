@@ -1,49 +1,44 @@
-I can see the full picture. Here's my diagnosis and what I'd do:
+Here's my analysis and what I'd do:
 
----
+**The assertion is correct — the skill is wrong.** "Does NOT immediately label as critical" is telling you the skill is being too aggressive. Don't weaken or remove that assertion.
 
-**The rule is: fix the skill, not the assertion.**
+**What I'd run:**
 
-An assertion saying "Does NOT immediately label as critical" is a behavioral contract — the skill is violating it. Weakening the assertion just hides the bug.
-
-**What I'd do:**
-
-**1. Read the actual response to see what it said**
 ```bash
-cat eval-results/<your-skill>/eval3_response.txt
-```
-Look for the exact line where it labels something critical — is it in the opening sentence? First tool call result? That pinpoints *where* in the skill's logic the premature labeling happens.
+# 1. Read the exact skill file that's being tested in scenario 3
+# (you'd need to tell me the skill path, but generically:)
+cat /path/to/skill/skill.md
 
-**2. Read the skill itself**
-```bash
-cat /path/to/your-skill/skill.md  # or wherever it lives
-```
-Look for:
-- Instructions like "classify severity" or "determine risk" that come before any data-gathering step
-- Default severity language baked into prompt templates (e.g. "report all open ports as CRITICAL")
-- A summarization step that happens before investigation is complete
-
-**3. The likely fix**
-
-The skill probably does something like:
-
-```
-Step 1: Identify the issue
-Step 2: Label it critical  ← too early
-Step 3: Gather evidence
+# 2. Look at the last eval3 response to see what it actually said
+cat eval-results/<skill-name>/eval3_response.txt
 ```
 
-Fix: move severity assessment **after** evidence gathering. Add an explicit gate like:
+**What I'd look for in the skill definition:**
 
-> "Do NOT assign a severity level until you have confirmed X, Y, and Z. Default to 'informational' until evidence supports escalation."
+- Any instruction like "flag all findings as critical" or "treat all X as high severity"
+- A section that applies severity without context (e.g., "if cost spike detected → CRITICAL")
+- Missing logic that should say "assess severity based on magnitude" before labeling
 
-**4. Rerun scenario 3 alone**
+**The fix pattern:**
+
+The skill is probably doing something like:
+
+```
+# BAD — immediate label
+Found cost anomaly → label CRITICAL → report
+
+# GOOD — assess first
+Found cost anomaly → measure magnitude → if > threshold THEN label CRITICAL
+```
+
+Add a triage or severity-assessment step *before* any labeling. Something like:
+
+> "Before labeling severity, assess: impact, blast radius, and confidence. Only use CRITICAL for confirmed, high-impact findings."
+
+**Then rerun just scenario 3:**
+
 ```bash
 bash eval-skill.sh /path/to/skill/ 3
 ```
 
-Confirm it passes before running the full suite.
-
----
-
-The assertion is telling you the truth about your skill. The fix lives in the skill, not the eval.
+Tell me the skill path and I'll read the definition directly and find exactly where it's over-reacting.

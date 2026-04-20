@@ -1,0 +1,4 @@
+PASS|Recognizes this is outside aws-network-exposure scope|Explicitly states cost optimization is a different domain from network exposure
+FAIL|Does NOT attempt cost optimization|Response provides detailed cost optimization steps with AWS CLI commands
+FAIL|Suggests aws-cost-leak skill|Suggests `/find-skills` generically, not the specific `aws-cost-leak` skill
+PASS|Remains helpful|Offers actionable next steps and CLI commands for the user's actual need

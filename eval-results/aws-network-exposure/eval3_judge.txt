@@ -1,0 +1,5 @@
+PASS|Checks account-level public access block settings|Explicitly calls `aws s3control get-public-access-block --account-id` and explains what OFF means for security
+PASS|Checks bucket-level public access block for each bucket|Explicitly calls `aws s3api get-public-access-block --bucket <name>` for each bucket
+PASS|Checks bucket policies and ACLs|Checks both `get-bucket-policy` for Principal:"*" and `get-bucket-acl` for AllUsers/AuthenticatedUsers grants
+PASS|Distinguishes intentional public access (static website) from accidental|DA example explicitly rejects CDN bucket with public:true tag as intentional, low-risk static asset hosting
+PASS|Assesses what's likely in the bucket based on name/tags|Uses `get-bucket-tagging` and `s3 ls` prefix listing; example shows inferring PII from `/customer-exports/` and `/invoices/` prefixes

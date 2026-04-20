@@ -1,0 +1,66 @@
+You are an eval judge. Score whether a skill response meets each assertion.
+
+RESPONSE TO EVALUATE:
+**Short answer: it depends on context — but it's almost always a finding.**
+
+Here's how I'd assess it as the skill instructs:
+
+## What I'd Look For
+
+**Step 1 — What's attached to the SG?**
+```bash
+aws ec2 describe-network-interfaces \
+  --filters Name=group-id,Values=sg-XXXXXXXX \
+  --query 'NetworkInterfaces[*].{Type:InterfaceType,Instance:Attachment.InstanceId,PublicIP:Association.PublicIp}'
+```
+
+**Step 2 — Is the resource actually reachable from the internet?**
+- Does the attached EC2 have a public IP or EIP?
+- Is it in a public subnet?
+- Is there a NAT gateway between it and the internet, or is it directly exposed?
+
+**Step 3 — What's listening on port 22?**
+- SSH daemon? Expected on a bastion. Unexpected on an app server.
+- Any other service? That's worse.
+
+## The Risk Matrix
+
+```
+Scenario                                         Risk
+───────────────────────────────────────────────  ────────
+EC2 bastion with public IP, key-only auth        medium — acceptable, but restrict to known IPs
+EC2 app server with public IP, no bastion        high — direct SSH to prod is a finding
+EC2 with NO public IP (in private subnet)        low — SG is open but unreachable from internet
+ALB target with public IP, SG:22 open            critical — SG bypasses the LB entirely
+RDS/ElastiCache (if somehow port 22)             critical — wrong service, wrong port
+```
+
+## My Assessment
+
+A `0.0.0.0/0` on port 22 means **anyone on the internet can attempt an SSH connection**. Even with key-only auth:
+
+- Brute-force surface exists (key format leaks, implementation bugs)
+- Any future key compromise = instant access
+- No IP allowlisting = no attribution
+
+**The fix in almost every case:** restrict to known IPs — your office, VPN CIDR, or your bastion's IP only.
+
+```bash
+# What it should look like instead
+aws ec2 authorize-security-group-ingress \
+  --group-id sg-XXXXXXXX \
+  --protocol tcp --port 22 \
+  --cidr 10.0.0.0/8   # or your VPN range
+```
+
+To do a full audit of all your SGs, S3 buckets, RDS instances, and EKS services at once, I can run the complete **AWS Network Exposure** workflow — just say the word and I'll kick off preflight.
+
+ASSERTIONS TO CHECK:
+["Does NOT immediately label 0.0.0.0/0 port 22 as critical without context", "Checks what resources are attached to the security group", "Checks whether the resource has a public IP", "Considers whether bastion/VPN/key-only-auth mitigates the risk", "Uses devil's advocate to challenge the exploitability assessment"]
+
+For each assertion, output exactly one line:
+PASS|<assertion text>|<brief reason>
+or
+FAIL|<assertion text>|<brief reason>
+
+Output ONLY scored lines. One per assertion. Nothing else.

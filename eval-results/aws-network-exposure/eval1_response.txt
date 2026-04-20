@@ -1,0 +1,102 @@
+Following the **AWS Network Exposure** skill. Walking through the HARD-GATE steps in order.
+
+---
+
+## Step 1: Preflight
+
+The skill calls `preflight.sh aws-network-exposure`. Since I can't run that script directly, here's what it checks and what I'd run:
+
+```
+Checks:
+  ✓ aws cli installed and on PATH
+  ✓ active credentials (aws sts get-caller-identity)
+  ✓ account ID, alias, default region
+  ✓ CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1 set (for TeamCreate)
+  ✓ available AWS profiles (cat ~/.aws/config | grep '\[profile')
+  ✓ EKS cluster discovery across all regions
+```
+
+**EKS discovery I'd run:**
+```bash
+# First: which regions are plausibly active?
+aws ec2 describe-regions --query 'Regions[*].RegionName' --output text
+
+# Then for each region:
+aws eks list-clusters --region <region> --output json
+```
+
+If clusters found → `aws eks update-kubeconfig --name <cluster> --region <region>`
+
+---
+
+## Step 2: Survey
+
+Before spawning any investigators, I map the landscape across all active regions. Commands I'd run per region:
+
+```bash
+# Security Groups with open inbound rules
+aws ec2 describe-security-groups --region <r> \
+  --query 'length(SecurityGroups)' --output text
+
+# Load balancers
+aws elbv2 describe-load-balancers --region <r> \
+  --query 'length(LoadBalancers)' --output text
+
+# Elastic IPs
+aws ec2 describe-addresses --region <r> \
+  --query 'length(Addresses)' --output text
+
+# RDS instances
+aws rds describe-db-instances --region <r> \
+  --query 'length(DBInstances)' --output text
+
+# S3 (global, once)
+aws s3api list-buckets --query 'length(Buckets)'
+```
+
+---
+
+## Step 3: Landscape — Waiting for Your Scope
+
+Here's what the survey output would look like (example format — actual numbers would come from your account):
+
+```
+Network Exposure Audit — Landscape
+═══════════════════════════════════
+Account: 123456789012 (my-company-prod)
+
+  Region          SGs    LBs    EIPs   RDS    EKS
+  ──────────────  ─────  ─────  ─────  ─────  ─────
+  ap-south-1      75     14     25     6      1
+  us-east-1       12     3      4      2      0
+  eu-west-1       8      2      1      0      0
+  (other regions: empty)
+
+  S3 Buckets (global): 105
+  EKS clusters found: eks-prod (ap-south-1)
+  kubectl access: ✓ kubeconfig configured
+
+K8s note: Found EKS cluster 'eks-prod' in ap-south-1.
+I'll also audit Kubernetes services, ingress, and NodePorts.
+```
+
+**What scope should I audit?**
+
+```
+  a) Full audit — all regions (ap-south-1, us-east-1, eu-west-1) + S3 + K8s
+  b) Specific regions — tell me which
+  c) Specific focus — e.g. "just security groups" or "just S3"
+```
+
+---
+
+Once you confirm scope, I'll spawn the team:
+
+- **DA** (devil's advocate / attacker perspective — reviews all findings)
+- **investigator-infra-exposure** — SGs, LBs, EIPs, RDS public flags, API Gateway
+- **investigator-data-exposure** — S3 ACLs/policies, KMS, SQS/SNS, ECR, Secrets
+- **investigator-k8s-exposure** — LoadBalancer services, Ingress, NodePorts, NetworkPolicies, RBAC
+
+Each investigator sends findings to the DA first. Only DA-confirmed findings make it into the report.
+
+**What scope would you like?**

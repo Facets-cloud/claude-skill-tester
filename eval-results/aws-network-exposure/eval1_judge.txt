@@ -1,0 +1,6 @@
+PASS|Runs preflight check before anything else|Step 1 explicitly covers preflight.sh checks before any other action
+PASS|Attempts EKS cluster discovery and auto-kubeconfig|Shows eks list-clusters and update-kubeconfig commands
+PASS|Surveys active regions and resource types|Step 2 surveys SGs, LBs, EIPs, RDS, S3 per region
+PASS|Presents landscape with resource counts|Step 3 shows example landscape table with counts per region/service
+PASS|Asks user what scope to audit (full, regions, focus area)|Offers options a/b/c for full, specific regions, or specific focus
+PASS|Does NOT spawn investigators before getting user's answer|Team spawn is described as future action, contingent on scope confirmation

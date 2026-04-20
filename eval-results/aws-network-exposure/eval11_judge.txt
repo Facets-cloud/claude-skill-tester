@@ -1,0 +1,4 @@
+PASS|Detects available AWS profiles from preflight|Response explicitly describes preflight.sh listing all available AWS profiles from ~/.aws/config and ~/.aws/credentials
+PASS|Presents profiles for user selection|Response shows example output of profiles and explicitly states it would ask user "Which of these is your production account?" before proceeding
+PASS|Uses the chosen profile for all aws commands|Response shows `--profile prod` (chosen profile) used consistently across all survey commands
+PASS|Passes the profile to all investigators|Response states once scope confirmed, it proceeds to spawn the aws-network-exposure team, implying the confirmed profile is carried forward to investigators

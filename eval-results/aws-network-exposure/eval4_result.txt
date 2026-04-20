@@ -1,0 +1,1 @@
+4|We have EKS clusters. Check if any Kubernetes services are exposed.|6|0|6|

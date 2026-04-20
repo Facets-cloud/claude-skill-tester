@@ -1,0 +1,32 @@
+**No — by itself, it's not a finding.**
+
+The skill explicitly distinguishes intentional exposure from accidental exposure. An internet-facing ALB serving a public website is doing exactly what it's supposed to do.
+
+What the audit *would* check to confirm it's well-managed:
+
+```
+ALB (prod-web) — internet-facing
+  ├── TLS?           → HTTPS on 443, HTTP redirecting to HTTPS?
+  ├── WAF?           → aws elbv2 describe-load-balancer-attributes
+  │                    look for waf.fail_open.enabled or
+  │                    aws wafv2 list-web-acls + association check
+  ├── Security Group → inbound 443 from 0.0.0.0/0 ✓ expected
+  │                    inbound 80 from 0.0.0.0/0 ✓ for redirect
+  │                    inbound 22/3306/etc ✗ would be a finding
+  └── Targets        → are target instances/pods directly
+                       reachable too, or only via the ALB?
+```
+
+The skill would log it in the Attack Surface Map as:
+
+```
+Internet → ALB (prod-web) → EC2/pods   443/HTTPS   WAF + TLS   low
+```
+
+Risk is **low** (not zero — WAF misconfig, cert expiry, etc. are still possible) but it's **not a finding** requiring remediation. The DA would confirm it as expected exposure, not a vulnerability.
+
+Where it *would* become a finding:
+- No TLS (serving HTTP only)
+- No WAF on a customer-facing app
+- Backend targets also have public IPs and open SGs (bypassing the ALB)
+- ALB listener forwarding to a port that shouldn't be public (e.g., port 8080 admin panel)

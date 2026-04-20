@@ -1,0 +1,4 @@
+PASS|Checks RDS PubliclyAccessible flag|Explicitly queries PubliclyAccessible flag via describe-db-instances
+PASS|Checks the associated security group inbound rules|Checks SG inbound rules for 0.0.0.0/0 on port 3306 after identifying public instances
+PASS|Distinguishes between publicly accessible with restrictive SG vs open SG|Table clearly shows PubliclyAccessible=true + VPC CIDR only as "MISCONFIGURED but not exploitable" vs open SG as "CRITICAL"
+PASS|Assesses actual exploitability, not just configuration flags|DA enforces that both the flag AND SG evidence must be present for a finding to be valid

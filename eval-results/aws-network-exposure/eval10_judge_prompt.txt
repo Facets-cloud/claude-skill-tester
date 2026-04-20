@@ -1,0 +1,126 @@
+You are an eval judge. Score whether a skill response meets each assertion.
+
+RESPONSE TO EVALUATE:
+Here's exactly what I would do, following the skill's HARD-GATE steps:
+
+---
+
+## Step 1: Preflight
+
+```bash
+bash "$SKILL_DIR/preflight.sh" aws-network-exposure
+```
+
+This checks AWS CLI is installed, credentials are valid, and gets account ID/alias. It also discovers EKS clusters across all regions and attempts `aws eks update-kubeconfig` for each.
+
+If multiple AWS profiles exist, I'd ask which one to use.
+
+---
+
+## Step 2: Survey
+
+I'd run describe calls across all regions to build a landscape:
+
+```bash
+# Find active regions
+aws ec2 describe-regions --query 'Regions[].RegionName' --output text
+
+# Per region, count resources
+aws rds describe-db-instances --region ap-south-1 \
+  --query 'DBInstances[*].[DBInstanceIdentifier,PubliclyAccessible,VpcSecurityGroups]'
+
+aws ec2 describe-security-groups --region ap-south-1 \
+  --query 'SecurityGroups[?IpPermissions[?IpRanges[?CidrIp==`0.0.0.0/0`]]]'
+
+aws elbv2 describe-load-balancers --region ap-south-1 \
+  --query 'LoadBalancers[?Scheme==`internet-facing`]'
+```
+
+---
+
+## Step 3: Present Landscape & Ask Scope
+
+I'd show you something like:
+
+```
+Network Exposure Audit — Landscape
+═══════════════════════════════════
+Account: 123456789012 (my-company)
+
+  Region          SGs    LBs    EIPs   RDS    EKS
+  ──────────────  ─────  ─────  ─────  ─────  ─────
+  ap-south-1      75     14     25     6      1
+  us-east-1       5      0      1      0      0
+
+  S3 Buckets (global): 105
+
+What scope should I audit?
+  a) Full audit — all regions, all resource types
+  b) Specific regions
+  c) Specific focus — e.g. "just RDS"
+```
+
+**I'd wait for your answer before proceeding.**
+
+---
+
+## Step 4: Spawn Team
+
+```
+TeamCreate({ team_name: "aws-network-exposure" })
+```
+
+Three agents:
+- **exposure-da** — devil's advocate / penetration tester mindset
+- **investigator-infra-exposure** — checks SGs, EIPs, LBs, RDS `PubliclyAccessible` flag
+- **investigator-data-exposure** — checks S3, KMS, SQS, ECR
+- **investigator-k8s-exposure** — only if EKS kubeconfig was configured
+
+For your specific RDS question, `investigator-infra-exposure` would run:
+
+```bash
+# Check PubliclyAccessible flag
+aws rds describe-db-instances \
+  --query 'DBInstances[*].{ID:DBInstanceIdentifier,Public:PubliclyAccessible,SGs:VpcSecurityGroups[*].VpcSecurityGroupId}' \
+  --output table
+
+# For each "PubliclyAccessible: true" instance, check its SG
+aws ec2 describe-security-groups \
+  --group-ids sg-xxxxxxxx \
+  --query 'SecurityGroups[*].IpPermissions[?IpRanges[?CidrIp==`0.0.0.0/0`]]'
+```
+
+**Critical distinction the DA would enforce:**
+
+| Situation | Verdict |
+|-----------|---------|
+| `PubliclyAccessible=true` + SG allows `0.0.0.0/0` on port 3306 | **CRITICAL** — directly reachable |
+| `PubliclyAccessible=true` + SG only allows VPC CIDR | **MISCONFIGURED** but not exploitable — still a finding |
+| `PubliclyAccessible=false` | Not internet-reachable regardless of SG |
+
+The DA would reject any finding that doesn't show *both* the flag AND the SG evidence — because you need both vectors to be open for actual exposure.
+
+---
+
+## Steps 5-7: Compile, Validate, Present
+
+After DA-confirmed findings, I'd write a dated report to `network-exposure/reports/`, run the validator, and present the attack surface map with an exposure posture score.
+
+---
+
+**To actually run this audit**, I need:
+1. AWS CLI configured with credentials
+2. `export CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1` set
+3. Your confirmation to proceed
+
+Want me to run the real audit now?
+
+ASSERTIONS TO CHECK:
+["Checks RDS PubliclyAccessible flag", "Checks the associated security group inbound rules", "Distinguishes between publicly accessible with restrictive SG vs open SG", "Assesses actual exploitability, not just configuration flags"]
+
+For each assertion, output exactly one line:
+PASS|<assertion text>|<brief reason>
+or
+FAIL|<assertion text>|<brief reason>
+
+Output ONLY scored lines. One per assertion. Nothing else.

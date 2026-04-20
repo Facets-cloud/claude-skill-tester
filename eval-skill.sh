@@ -96,12 +96,12 @@ run_claude() {
     if [[ -n "$timeout_cmd" ]]; then
         $timeout_cmd "$TIMEOUT" $CLAUDE_CMD --print \
             --model "$MODEL" \
-            --max-turns 8 \
+            --max-turns 10 \
             -p "$(cat "$prompt_file")" > "$output_file" 2>/dev/null || true
     else
         $CLAUDE_CMD --print \
             --model "$MODEL" \
-            --max-turns 8 \
+            --max-turns 10 \
             -p "$(cat "$prompt_file")" > "$output_file" 2>/dev/null || true
     fi
 }

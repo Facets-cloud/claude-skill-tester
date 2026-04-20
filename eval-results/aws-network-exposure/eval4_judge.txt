@@ -1,0 +1,6 @@
+PASS|Auto-discovers EKS clusters from AWS|Response shows `aws eks list-clusters --region <region>` for every active region
+PASS|Configures kubeconfig via aws eks update-kubeconfig|Response explicitly shows `aws eks update-kubeconfig --name <cluster-name> --region <region> --profile <chosen>`
+PASS|Spawns K8s exposure investigator|Response describes spawning a dedicated `Investigator: k8s-exposure` agent via TeamCreate
+PASS|Checks Services type LoadBalancer for internet-facing|Response shows kubectl query filtering `.spec.type == "LoadBalancer"` and notes risk of external hostname without WAF/TLS
+PASS|Checks Ingress resources for missing auth/TLS|Response shows `kubectl get ingress --all-namespaces -o yaml` and explicitly flags no TLS/no auth annotation as risky signals
+PASS|Checks for NodePort services on nodes with public IPs|Response shows `kubectl get svc --field-selector spec.type=NodePort` and notes "Nodes have public IPs → high port exposed"

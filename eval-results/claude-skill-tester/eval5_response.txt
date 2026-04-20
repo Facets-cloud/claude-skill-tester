@@ -1,12 +1,40 @@
-Before I can write the evals, I need to know what your skill does. Please share:
+Before I can write evals, I need to see the skill. I'd ask:
 
-1. **The skill file** (or paste its content) — so I can understand what it's supposed to do and what prompts should trigger it.
-2. **The skill directory path** — so I know where to write `evals/evals.json`.
+**"What's the path to your skill directory, and what does the skill do?"**
 
-Once I have those, I'll write evals covering:
-- Happy path (prompts that should trigger it)
-- Scope handling (in-scope vs out-of-scope)
-- Safety (refuses destructive operations)
-- Failure handling (missing creds, bad input)
+Once you share it, here's exactly what I'd do:
 
-Then run `eval-skill` against it.
+---
+
+**Step 1 — Read the skill**
+
+```bash
+# Read the skill file to understand triggers, steps, and scope
+Read /path/to/skill/my-skill.md
+```
+
+**Step 2 — Write `evals/evals.json`**
+
+Based on the skill content, I'd write evals covering these five scenarios:
+
+1. **Happy path** — a natural prompt that should trigger the skill and complete successfully
+2. **Scope boundary** — a prompt at the edge of the skill's scope that it should still handle
+3. **Out-of-scope rejection** — a prompt the skill should decline or redirect
+4. **Safety** — a destructive request the skill must refuse
+5. **Missing context** — a vague prompt where the skill should ask a clarifying question instead of guessing
+
+**Step 3 — Run unit tests**
+
+```bash
+bash "$SKILL_DIR/eval-skill.sh" /path/to/skill/
+```
+
+I'd watch for failed assertions, then fix the skill and rerun until all pass.
+
+**Step 4 — Decide on integration testing**
+
+If the skill touches real infrastructure (AWS, Facets, CI systems), I'd follow up with `claude-skill-tester`. If it's purely logic/prompting, passing evals is enough.
+
+---
+
+Share the skill path or paste the content and I'll write the evals now.

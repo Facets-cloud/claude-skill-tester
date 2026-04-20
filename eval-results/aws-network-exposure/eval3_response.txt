@@ -1,0 +1,182 @@
+Here's exactly what I would do, following the skill's HARD-GATE steps in order:
+
+---
+
+## Step 1: Preflight
+
+```bash
+bash "$SKILL_DIR/preflight.sh" aws-network-exposure
+```
+
+This checks:
+- `aws` CLI is installed and on PATH
+- Credentials are valid (`aws sts get-caller-identity`)
+- Lists available AWS profiles (e.g., `default`, `prod`, `staging`)
+- Discovers EKS clusters in all active regions
+- Checks `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1` is set
+
+**If multiple profiles exist**, I'd list them and ask: *"Which AWS profile should I use for this audit?"* Then use `--profile <chosen>` everywhere.
+
+---
+
+## Step 2: Survey — Active Regions + Resource Counts
+
+I would run discovery across all regions:
+
+```bash
+# Get all opted-in regions
+aws ec2 describe-regions --query 'Regions[].RegionName' --output text
+
+# For each region, count relevant resources
+aws ec2 describe-security-groups --region <r> --query 'length(SecurityGroups)'
+aws elbv2 describe-load-balancers --region <r> --query 'length(LoadBalancers)'
+aws ec2 describe-addresses --region <r> --query 'length(Addresses)'
+aws rds describe-db-instances --region <r> --query 'length(DBInstances)'
+
+# S3 is global — one call
+aws s3api list-buckets --query 'length(Buckets)'
+```
+
+Then present a landscape table like:
+
+```
+Network Exposure Audit — Landscape
+═══════════════════════════════════
+Account: 123456789012 (my-company)
+
+  Region          SGs    LBs    EIPs   RDS    EKS
+  ──────────────  ─────  ─────  ─────  ─────  ─────
+  us-east-1       42     8      12     3      0
+  ap-south-1      15     2      4      1      0
+  (other regions: empty)
+
+  S3 Buckets (global): 47
+```
+
+---
+
+## Step 3: Ask for Scope
+
+I would **stop and ask you**:
+
+> What scope should I audit?
+> - `a)` Full audit — all regions, all resource types
+> - `b)` Specific regions — e.g. "just us-east-1"
+> - `c)` Specific focus — you said "just S3", so I'd interpret that as: **data exposure only, global**
+
+Since you asked specifically about S3, I'd likely confirm: *"Sounds like you want a focused S3-only audit. Should I run a full data exposure scan (S3 + KMS + ECR + SQS) or strictly S3?"*
+
+---
+
+## Step 4: Spawn Team
+
+```
+TeamCreate({ team_name: "aws-network-exposure" })
+```
+
+Two agents:
+
+**`exposure-da`** — devil's advocate. Thinks like a pentester. Rejects findings that lack context (e.g., a "public" bucket that's a static website CDN) and confirms ones with real blast radius.
+
+**`investigator-data-exposure`** — runs the actual S3 investigation. Here's exactly what it would do:
+
+### S3 Investigation Commands
+
+```bash
+# 1. Account-level public access block (if ON, most public access is prevented)
+aws s3control get-public-access-block --account-id 123456789012
+
+# 2. For each bucket — bucket-level block
+aws s3api get-public-access-block --bucket <name>
+
+# 3. Bucket policy — check for Principal: "*" or Principal: {"AWS": "*"}
+aws s3api get-bucket-policy --bucket <name>
+
+# 4. ACLs — check for AllUsers or AuthenticatedUsers grants
+aws s3api get-bucket-acl --bucket <name>
+
+# 5. If public — what's in it? (names, tags, a few key prefixes)
+aws s3api get-bucket-tagging --bucket <name>
+aws s3 ls s3://<name> --no-sign-request  # can an anonymous user even list it?
+```
+
+### What the Investigator Looks For
+
+```
+Layer                    Vulnerable State
+───────────────────────  ────────────────────────────────────────────
+Account block            OFF → lower-level policies can expose buckets
+Bucket block             OFF → policy/ACL can expose this bucket
+Bucket policy            Principal: "*" with s3:GetObject → public read
+ACL                      AllUsers → public read/write
+                         AuthenticatedUsers → ANY AWS account (effectively public)
+Static website hosting   Intentional public — flag but likely low risk
+```
+
+### Investigator Reports to DA
+
+For each exposed bucket, the investigator sends evidence like:
+
+```
+Bucket: my-company-data-exports
+  - Account block: OFF
+  - Bucket block: OFF
+  - Policy: { "Principal": "*", "Action": "s3:GetObject", "Effect": "Allow" }
+  - Contents: prefix listing shows /customer-exports/2025/, /invoices/
+  - Risk assessment: customer PII likely present based on prefix names
+```
+
+DA responds: **CONFIRMED — critical. No account-level or bucket-level block. Wildcard principal on GetObject. Customer data likely present.**
+
+Or for a CDN bucket:
+
+```
+Bucket: my-company-static-assets
+  - Policy: Principal: "*", Action: s3:GetObject
+  - Tags: { "use": "cdn", "public": "true" }
+  - Contents: /css/, /js/, /images/
+```
+
+DA responds: **REJECTED as a finding — intentionally public static asset CDN. Low risk. Note it but don't flag as a vulnerability.**
+
+---
+
+## Step 5: Compile + Score
+
+After all DA-confirmed findings, I assess:
+
+- How many buckets are unintentionally public?
+- What data is in them? (PII, backups, logs, code?)
+- Is the account-level block on or off?
+
+Scoring example:
+- Account block OFF + 1 public data bucket with customer exports → likely **D (30-49)**
+- Account block ON + zero public buckets except 2 known CDN buckets → likely **A (90-100)**
+
+Write `network-exposure/scores/exposure-posture.json` and `network-exposure/reports/report-<timestamp>.md`.
+
+---
+
+## Step 6: Validate
+
+```bash
+node "$SKILL_DIR/validate-report.js" --file network-exposure/reports/latest.md
+```
+
+Fix any missing sections if it returns `"verdict": "FAIL"`.
+
+---
+
+## Step 7: Present
+
+The final output would include:
+
+- **Exposure posture score** with reasoning
+- **Attack surface map** — which buckets are reachable and how
+- **Critical findings** — with full attack path and recommended fix (e.g., "Enable bucket-level public access block: `aws s3api put-public-access-block --bucket X --public-access-block-configuration BlockPublicAcls=true,...`")
+- **Data exposure table** — every bucket, access level, estimated contents, risk
+- **Defense-in-depth status** — is the account-level block on? Are bucket-level blocks consistent?
+
+---
+
+**Bottom line:** I can't actually run these commands right now — but if you have AWS credentials configured, I can execute this audit for real. Just say the word and I'll run preflight and begin.

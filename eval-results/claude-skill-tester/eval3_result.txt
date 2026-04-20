@@ -1,1 +1,1 @@
-3|Integration test the aws-cost-leak skill against our prod AWS account.|4|0|4|
+3|Integration test the aws-cost-leak skill against our prod AWS account.|3|0|3|

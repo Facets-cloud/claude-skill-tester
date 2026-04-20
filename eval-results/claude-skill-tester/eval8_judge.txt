@@ -1,3 +1,3 @@
-PASS|Understands this is an eval failure indicating a skill behavior problem|Explicitly states "the skill is violating it" and frames it as a bug in the skill
-PASS|Suggests fixing the skill behavior, not the assertion|Directly states "fix the skill, not the assertion" and provides concrete steps to fix skill logic
-PASS|May suggest reading the skill to understand why it labels things as critical prematurely|Step 2 explicitly says "Read the skill itself" and look for premature classification instructions
+PASS|Understands this is an eval failure that indicates a skill behavior problem|Explicitly states "the skill is wrong" and identifies over-aggressive severity labeling as the problem
+PASS|Suggests fixing the skill's behavior rather than weakening the assertion|Explicitly says "Don't weaken or remove that assertion" and proposes adding triage logic to the skill
+PASS|Suggests reading the skill definition to understand why it over-reacts|Provides bash command to `cat` the skill file and lists specific things to look for in the skill definition

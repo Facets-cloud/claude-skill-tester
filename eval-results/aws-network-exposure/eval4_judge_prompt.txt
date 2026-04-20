@@ -1,0 +1,162 @@
+You are an eval judge. Score whether a skill response meets each assertion.
+
+RESPONSE TO EVALUATE:
+The skill has a **HARD-GATE** — I can't jump straight to K8s. I must follow all 7 steps in order. Here's exactly what I would do:
+
+---
+
+## Step 1: Preflight
+
+```bash
+bash "$SKILL_DIR/preflight.sh" aws-network-exposure
+```
+
+This checks: `aws` CLI installed, valid credentials, account ID/alias, teams mode enabled (`CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1`), and lists available AWS profiles.
+
+Then for EKS discovery, in every active region:
+
+```bash
+aws eks list-clusters --region <region> --profile <chosen>
+```
+
+For each cluster found:
+```bash
+aws eks update-kubeconfig --name <cluster-name> --region <region> --profile <chosen>
+kubectl cluster-info  # verify access
+```
+
+**Expected output to user:**
+> "Found EKS cluster(s): `prod-cluster` (ap-south-1). I'll also audit Kubernetes services, ingress, and NodePorts for external exposure."
+
+---
+
+## Step 2: Survey
+
+For each active region, I'd count resources:
+
+```bash
+aws ec2 describe-security-groups --region <r> --query 'length(SecurityGroups)'
+aws elbv2 describe-load-balancers --region <r> --query 'length(LoadBalancers)'
+aws ec2 describe-addresses --region <r> --query 'length(Addresses)'
+aws rds describe-db-instances --region <r> --query 'length(DBInstances)'
+aws s3api list-buckets --query 'length(Buckets)'  # global, once
+```
+
+---
+
+## Step 3: Present Landscape, Wait for Scope
+
+I'd show something like:
+
+```
+Network Exposure Audit — Landscape
+═══════════════════════════════════
+Account: 123456789012 (acme-prod)
+
+  Region          SGs    LBs    EIPs   RDS    EKS
+  ──────────────  ─────  ─────  ─────  ─────  ─────
+  ap-south-1      75     14     25     6      1
+  us-east-1       5      0      1      0      0
+
+  S3 Buckets (global): 105
+
+What scope should I audit?
+  a) Full audit — all regions, all resource types
+  b) Specific regions
+  c) Specific focus (e.g. "just K8s")
+```
+
+**I stop here and wait for your answer before spawning any investigators.**
+
+---
+
+## Step 4: Spawn Team (after you confirm scope)
+
+```
+TeamCreate({ team_name: "aws-network-exposure" })
+```
+
+I'd spawn these agents in order:
+
+**1. Devil's Advocate** (first, always):
+> A penetration tester mindset — challenges every finding for exploitability, not just exposure. Responds CONFIRMED or REJECTED to each investigator report.
+
+**2. Investigator: infra-exposure** + **Investigator: data-exposure** (parallel batch)
+
+**3. Investigator: k8s-exposure** (since you confirmed EKS exists):
+
+This agent runs:
+
+```bash
+# All LoadBalancer services — each one creates an AWS ELB
+kubectl get svc --all-namespaces -o json | jq '
+  .items[] | select(.spec.type == "LoadBalancer") |
+  {ns: .metadata.namespace, name: .metadata.name,
+   hostname: .status.loadBalancer.ingress[0].hostname,
+   ports: .spec.ports}'
+
+# All NodePort services — exposed on every node's IP
+kubectl get svc --all-namespaces --field-selector spec.type=NodePort
+
+# All Ingress resources — hosts, TLS, auth annotations
+kubectl get ingress --all-namespaces -o yaml
+
+# Network policies — absence = no lateral movement controls
+kubectl get networkpolicy --all-namespaces
+
+# ClusterRoleBindings to cluster-admin
+kubectl get clusterrolebinding -o json | jq '
+  .items[] | select(.roleRef.name == "cluster-admin") |
+  {name: .metadata.name, subjects: .subjects}'
+
+# Pods pulling from public registries (not ECR)
+kubectl get pods --all-namespaces -o json | jq '
+  .items[].spec.containers[].image |
+  select(startswith("123456789012.dkr.ecr") | not)'
+```
+
+**What the K8s investigator looks for:**
+
+| Check | Risky signal |
+|---|---|
+| `LoadBalancer` services | External hostname + no WAF/TLS |
+| `Ingress` | No TLS, no auth annotation (oauth2-proxy, etc.) |
+| `NodePort` | Nodes have public IPs → high port exposed |
+| `NetworkPolicy` | Absent = free lateral movement post-compromise |
+| `ClusterRoleBinding` | cluster-admin to app namespace SA |
+| Container images | DockerHub pulls = supply chain risk |
+
+Each finding goes to `exposure-da` for CONFIRMED/REJECTED before being included in the report.
+
+---
+
+## Steps 5-7: Compile → Validate → Present
+
+After all DA-confirmed findings come in, I'd write:
+
+- `network-exposure/scores/exposure-posture.json` — score 0–100
+- `network-exposure/reports/report-<timestamp>.md` — full report
+- `network-exposure/reports/latest.md` — symlink
+
+Then run the validator:
+```bash
+node "$SKILL_DIR/validate-report.js" --file network-exposure/reports/latest.md
+```
+
+Only present to you after `"verdict": "PASS"`.
+
+---
+
+**Bottom line on the K8s audit:** The key risks I'd be hunting are LoadBalancer services creating public ELBs for internal services (admin panels, databases via service mesh), ingress resources with no TLS or auth, and absent NetworkPolicies that turn a single compromised pod into a free lateral movement platform.
+
+**Ready to actually run this?** Confirm scope (Step 3) and I'll proceed — I just need `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1` set and valid AWS credentials.
+
+ASSERTIONS TO CHECK:
+["Auto-discovers EKS clusters from AWS", "Configures kubeconfig via aws eks update-kubeconfig", "Spawns K8s exposure investigator", "Checks Services type LoadBalancer for internet-facing", "Checks Ingress resources for missing auth/TLS", "Checks for NodePort services on nodes with public IPs"]
+
+For each assertion, output exactly one line:
+PASS|<assertion text>|<brief reason>
+or
+FAIL|<assertion text>|<brief reason>
+
+Output ONLY scored lines. One per assertion. Nothing else.

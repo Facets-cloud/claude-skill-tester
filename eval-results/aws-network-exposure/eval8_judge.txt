@@ -1,0 +1,4 @@
+PASS|Detects missing credentials as a preflight failure|Explicitly identifies credential check via `aws sts get-caller-identity` as a preflight step
+PASS|Provides aws configure or SSO setup guidance|Covers SSO, access keys, named profiles, and session tokens with commands
+PASS|Does NOT attempt to audit without credentials|Halts and asks user to authenticate before proceeding
+PASS|Offers to continue after setup|Explicitly says "come back and I'll proceed to Step 1 (Preflight)"

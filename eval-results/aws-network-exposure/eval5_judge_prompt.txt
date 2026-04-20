@@ -1,0 +1,95 @@
+You are an eval judge. Score whether a skill response meets each assertion.
+
+RESPONSE TO EVALUATE:
+Given the permission issue blocking flow commands, let me respond directly to the AWS skill question.
+
+---
+
+## AWS Network Exposure — Step 1: Preflight (described)
+
+Here's exactly what I would do, following the skill's HARD-GATE:
+
+**Preflight commands I'd run:**
+
+```bash
+aws sts get-caller-identity
+aws configure list-profiles
+# Then for EKS discovery across all regions:
+aws ec2 describe-regions --query 'Regions[].RegionName' --output text | \
+  xargs -I{} aws eks list-clusters --region {} 2>&1
+```
+
+**What would happen with your credentials:**
+
+The `eks list-clusters` call would return `AccessDeniedException` (since `eks:DescribeCluster` is missing — and often `eks:ListClusters` is also absent). Per the skill's explicit rule:
+
+> *"If EKS clusters found but kubeconfig failed (permissions), report it as optional — AWS-only audit proceeds."*
+
+Since we can't discover clusters at all, I'd report:
+
+```
+Preflight complete.
+  Account: <account_id> (<alias>)
+  EKS discovery: skipped — eks:ListClusters/eks:DescribeCluster not permitted
+  K8s audit: unavailable — proceeding with AWS-only audit
+```
+
+**No K8s investigator will be spawned.** Only `investigator-infra-exposure` and `investigator-data-exposure` will run.
+
+---
+
+## Step 2: Survey (described)
+
+I'd run these per active region to build the landscape table:
+
+```bash
+# Active regions
+aws ec2 describe-regions --query 'Regions[?OptInStatus!=`not-opted-in`].RegionName' --output text
+
+# Per region (parallelized):
+aws ec2 describe-security-groups --region $R --query 'length(SecurityGroups)'
+aws elbv2 describe-load-balancers --region $R --query 'length(LoadBalancers)'
+aws ec2 describe-addresses --region $R --query 'length(Addresses)'
+aws rds describe-db-instances --region $R --query 'length(DBInstances)'
+
+# S3 is global:
+aws s3api list-buckets --query 'length(Buckets)'
+```
+
+---
+
+## Step 3: I'd present this landscape to you and ask for scope
+
+```
+Network Exposure Audit — Landscape
+═══════════════════════════════════
+Account: <account_id> (<alias>)
+EKS: not accessible (eks:ListClusters permission missing — K8s audit skipped)
+
+  Region          SGs    LBs    EIPs   RDS
+  ──────────────  ─────  ─────  ─────  ─────
+  <results here>
+
+  S3 Buckets (global): <N>
+
+What scope should I audit?
+  a) Full audit — all regions
+  b) Specific regions
+  c) Specific focus (e.g. "just S3" or "just security groups")
+```
+
+**At this point I'd wait for your answer before spawning any investigators.**
+
+---
+
+What scope do you want to audit? And do you have your AWS account/region handy so I can actually run the preflight and survey for real?
+
+ASSERTIONS TO CHECK:
+["Detects EKS permission failure from preflight", "Informs user that K8s audit is skipped", "Proceeds with AWS-only audit without failing", "Does NOT require K8s access to complete the audit"]
+
+For each assertion, output exactly one line:
+PASS|<assertion text>|<brief reason>
+or
+FAIL|<assertion text>|<brief reason>
+
+Output ONLY scored lines. One per assertion. Nothing else.

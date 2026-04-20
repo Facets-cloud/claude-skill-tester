@@ -1,0 +1,1 @@
+6|Find unused resources and reduce my AWS bill.|2|2|4|FAIL|Does NOT attempt cost optimization|Response provides detailed cost optimization steps with AWS CLI commands\nFAIL|Suggests aws-cost-leak skill|Suggests `/find-skills` generically, not the specific `aws-cost-leak` skill\n

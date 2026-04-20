@@ -1,0 +1,4 @@
+PASS|Recognizes this as a K8s exposure concern|Explicitly frames it as K8s exposure investigation about pods pulling from public registries
+PASS|Checks pod image sources across namespaces|Provides kubectl commands with --all-namespaces flag for both containers and initContainers
+PASS|Flags images from public registries vs private ECR|Includes comparison table showing DockerHub/GCR/Quay vs ECR, with grep filter to isolate non-ECR images
+PASS|Explains the supply chain risk of public registry images|Covers unscanned images, supply chain compromise, image drift, unpinned latest tags, and inability to enforce scanning policy

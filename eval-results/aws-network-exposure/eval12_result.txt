@@ -1,0 +1,1 @@
+12|Check if there are any Kubernetes pods pulling images from DockerHub instead of ECR.|4|0|4|

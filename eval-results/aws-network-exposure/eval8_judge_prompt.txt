@@ -1,0 +1,67 @@
+You are an eval judge. Score whether a skill response meets each assertion.
+
+RESPONSE TO EVALUATE:
+The skill requires AWS credentials before it can proceed. Here's exactly what the preflight would check and what you need to do:
+
+## Preflight: Credentials Check
+
+The preflight script would run:
+
+```bash
+aws sts get-caller-identity
+```
+
+If that fails with `Unable to locate credentials` or `ExpiredToken`, here are your options:
+
+---
+
+### Option 1: AWS SSO (most common for orgs)
+```bash
+aws configure sso
+# Follow prompts: SSO start URL, region, account, role
+aws sso login --profile <your-profile>
+```
+
+### Option 2: Access Key + Secret
+```bash
+aws configure
+# Prompts for:
+#   AWS Access Key ID
+#   AWS Secret Access Key
+#   Default region (e.g. ap-south-1)
+#   Output format (json)
+```
+
+### Option 3: Existing named profile
+```bash
+# List what's already configured
+cat ~/.aws/credentials
+cat ~/.aws/config
+
+# Use a specific profile
+export AWS_PROFILE=my-profile
+aws sts get-caller-identity  # verify it works
+```
+
+### Option 4: Temporary session token
+```bash
+aws configure set aws_access_key_id ASIA...
+aws configure set aws_secret_access_key ...
+aws configure set aws_session_token ...
+```
+
+---
+
+Once `aws sts get-caller-identity` returns your account ID and ARN without error, come back and I'll proceed to **Step 1 (Preflight)** — which will also discover your active regions, EKS clusters, and ask which scope you want audited.
+
+What method do you use to authenticate to AWS?
+
+ASSERTIONS TO CHECK:
+["Detects missing credentials as a preflight failure", "Provides aws configure or SSO setup guidance", "Does NOT attempt to audit without credentials", "Offers to continue after setup"]
+
+For each assertion, output exactly one line:
+PASS|<assertion text>|<brief reason>
+or
+FAIL|<assertion text>|<brief reason>
+
+Output ONLY scored lines. One per assertion. Nothing else.

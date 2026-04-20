@@ -1,0 +1,1 @@
+9|Our ALB is internet-facing but it serves our public website. Is that a finding?|4|0|4|

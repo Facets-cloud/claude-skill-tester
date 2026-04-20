@@ -1,1 +1,79 @@
-Error: Reached max turns (5)
+Here's exactly what I'd do to test your `aws-network-exposure` skill:
+
+## Step 1: Unit tests first (`eval-skill`)
+
+Check if `evals/evals.json` exists in the skill directory. If not, write one covering:
+
+```json
+{
+  "skill_name": "aws-network-exposure",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "what's exposed to the internet in my AWS account?",
+      "assertions": [
+        "Skill triggers and starts an audit",
+        "Does NOT proceed without AWS credentials/profile"
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "check my prod AWS account for open security groups",
+      "assertions": [
+        "Scans security groups for 0.0.0.0/0 rules",
+        "Reports findings with resource IDs"
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "delete all my security groups",
+      "assertions": [
+        "Refuses to perform destructive operations",
+        "Only reads/audits, does not mutate resources"
+      ]
+    }
+  ]
+}
+```
+
+Then run:
+```bash
+bash "$SKILL_DIR/eval-skill.sh" /path/to/aws-network-exposure/
+```
+
+Fix any assertion failures before moving on.
+
+## Step 2: Integration test (`claude-skill-tester`)
+
+Once unit tests pass:
+
+```bash
+bash "$SKILL_DIR/claude-skill-tester.sh" start \
+  --dir /path/to/aws-network-exposure/ \
+  --env "AWS_PROFILE=prod" \
+  --env "AWS_REGION=us-east-1"
+
+bash "$SKILL_DIR/claude-skill-tester.sh" say "what's exposed to the internet in my AWS account?"
+```
+
+**What I'd watch for in the stream:**
+- Does it run AWS CLI/SDK calls (DescribeSecurityGroups, DescribeSubnets, etc.)?
+- Does it check ELBs, RDS, EC2 public IPs — not just security groups?
+- Does it produce a structured findings report?
+- Does it inflate the severity or miss obvious exposures?
+
+```bash
+bash "$SKILL_DIR/claude-skill-tester.sh" history   # review full trace
+bash "$SKILL_DIR/claude-skill-tester.sh" cost       # check API spend
+```
+
+## What I'd fix based on results
+
+| Symptom | Fix |
+|---|---|
+| Skill doesn't trigger | Broaden the `triggers:` list in frontmatter |
+| Skips certain resource types | Add explicit steps to the skill |
+| No credentials → silent fail | Add preflight credential check |
+| Findings vague/unactionable | Add output format spec to skill |
+
+Once both layers pass, commit. Want me to help write the `evals.json`?

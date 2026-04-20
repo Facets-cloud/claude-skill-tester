@@ -1,3 +1,3 @@
-PASS|Recognizes this is outside skill-testing scope|Explicitly states deployment is "out of scope for this skill" and explains what Skill Tester actually handles
-PASS|Does NOT attempt deployment|No deployment steps taken; redirects to appropriate tools instead
-PASS|Remains helpful|Offers alternatives (facets-blueprint, deployment runbook) and asks clarifying question about user's actual need
+PASS|Recognizes this is outside the scope of skill testing|Explicitly states the request is "out of scope for the Skill Tester skill"
+PASS|Does NOT attempt any deployment actions|Only asks clarifying questions, takes no deployment actions
+PASS|Remains helpful and suggests where to go for deployment help|Asks for platform/infrastructure details and offers to help once provided

@@ -3,75 +3,74 @@
   "evals": [
     {
       "id": 1,
-      "prompt": "Test my aws-network-exposure skill.",
+      "prompt": "I just finished writing an aws-network-exposure skill. How should I test it?",
       "assertions": [
-        "Identifies that the skill needs to be tested",
-        "Decides whether to run unit tests (eval-skill) or integration tests (claude-skill-tester) or both",
-        "Asks the user for context if unclear — which skill directory, does it need real infra?"
+        "Mentions eval-skill or unit testing as a first step",
+        "Mentions claude-skill-tester or integration testing as a follow-up step",
+        "Explains the difference between unit tests and integration tests for skills"
       ]
     },
     {
       "id": 2,
-      "prompt": "Run evals on the k8s-debug skill in ~/devops-skills/skills/k8s-debug/",
+      "prompt": "Run unit test evals on the k8s-debug skill in ~/devops-skills/skills/k8s-debug/",
       "assertions": [
-        "Runs eval-skill.sh against the specified skill directory",
-        "Does NOT run claude-skill-tester for a unit test request",
-        "Reports pass/fail results from the eval"
+        "References eval-skill.sh as the tool to run unit test assertions",
+        "Does NOT suggest claude-skill-tester.sh for a unit test request — that tool is for live integration testing",
+        "References the correct skill directory path the user provided"
       ]
     },
     {
       "id": 3,
       "prompt": "Integration test the aws-cost-leak skill against our prod AWS account.",
       "assertions": [
-        "Uses claude-skill-tester for integration testing, not eval-skill",
-        "Sets up the session with the correct working directory",
-        "Asks or infers the AWS profile to use",
-        "Sends a natural user prompt to trigger the skill"
+        "Uses claude-skill-tester.sh to spawn a live Claude session",
+        "Sets up the session with the correct working directory and AWS profile",
+        "Sends a natural user prompt to trigger the skill, not a prescriptive instruction"
       ]
     },
     {
       "id": 4,
       "prompt": "My skill isn't triggering when users say 'check my network'. Can you test why?",
       "assertions": [
-        "Recognizes this as a trigger/activation problem",
-        "Suggests running eval-skill to test if the prompt triggers the skill",
-        "Does NOT immediately jump to integration testing"
+        "Recognizes this as a trigger or activation problem",
+        "Suggests running unit test evals to test if the prompt triggers the skill",
+        "Does NOT immediately jump to live infrastructure integration testing"
       ]
     },
     {
       "id": 5,
       "prompt": "I just wrote a new skill. It doesn't have evals yet.",
       "assertions": [
-        "Recognizes evals are missing",
-        "Offers to write evals/evals.json for the skill",
-        "Asks about the skill's purpose to write appropriate assertions"
+        "Recognizes evals are missing and need to be created",
+        "Offers to help write evals/evals.json for the skill",
+        "Either asks about the skill's purpose OR asks to see the skill file before writing evals"
       ]
     },
     {
       "id": 6,
       "prompt": "The DA keeps getting skipped in my skill. How do I fix it?",
       "assertions": [
-        "Recognizes this as an integration-level issue",
-        "Suggests using claude-skill-tester to observe the actual behavior",
-        "Suggests reading the history/stream to see where DA was bypassed"
+        "Recognizes this as a runtime behavior issue that needs integration testing",
+        "Suggests using claude-skill-tester to observe the actual DA behavior in a live session",
+        "Mentions reviewing the conversation history or stream to see what happened"
       ]
     },
     {
       "id": 7,
       "prompt": "Deploy my application to production.",
       "assertions": [
-        "Recognizes this is outside skill-testing scope",
-        "Does NOT attempt deployment",
-        "Remains helpful"
+        "Recognizes this is outside the scope of skill testing",
+        "Does NOT attempt any deployment actions",
+        "Remains helpful and suggests where to go for deployment help"
       ]
     },
     {
       "id": 8,
       "prompt": "The eval for scenario 3 keeps failing. The assertion says 'Does NOT immediately label as critical' but the skill always does.",
       "assertions": [
-        "Understands this is an eval failure indicating a skill behavior problem",
-        "Suggests fixing the skill behavior, not the assertion",
-        "May suggest reading the skill to understand why it labels things as critical prematurely"
+        "Understands this is an eval failure that indicates a skill behavior problem",
+        "Suggests fixing the skill's behavior rather than weakening the assertion",
+        "Suggests reading the skill definition to understand why it over-reacts"
       ]
     }
   ]

@@ -1,0 +1,96 @@
+You are an eval judge. Score whether a skill response meets each assertion.
+
+RESPONSE TO EVALUATE:
+Here's exactly what I would do, following the skill's HARD-GATE sequence:
+
+---
+
+## Step 1: Preflight
+
+I'd run:
+```bash
+bash "$SKILL_DIR/preflight.sh" aws-network-exposure
+```
+
+This checks: `aws` CLI installed, credentials valid, account ID/alias, and — critically — **lists all available AWS profiles** from `~/.aws/config` and `~/.aws/credentials`. Since you mentioned multiple profiles, it would output something like:
+
+```
+Available AWS profiles:
+  default
+  production
+  staging
+  sandbox
+  dev-account
+```
+
+I'd then **ask you**: "Which of these is your production account?" — waiting for your explicit confirmation before proceeding. I would NOT assume `production` is the right profile label without confirmation.
+
+I'd also run EKS discovery across ALL regions using the chosen profile:
+```bash
+aws eks list-clusters --region <each-region> --profile <chosen> 2>/dev/null
+```
+
+Then report whether K8s audit is available.
+
+---
+
+## Step 2: Survey
+
+Once you confirm the profile, I'd scan for active regions and resource counts:
+
+```bash
+# Get active regions (regions with at least one EC2 resource)
+aws ec2 describe-regions --profile prod --query 'Regions[].RegionName' --output text
+
+# Per region, get counts
+aws ec2 describe-security-groups --profile prod --region <r> --query 'length(SecurityGroups)'
+aws elbv2 describe-load-balancers --profile prod --region <r> --query 'length(LoadBalancers)'
+aws ec2 describe-addresses --profile prod --region <r> --query 'length(Addresses)'
+aws rds describe-db-instances --profile prod --region <r> --query 'length(DBInstances)'
+
+# S3 is global
+aws s3api list-buckets --profile prod --query 'length(Buckets)'
+```
+
+Then I'd present:
+
+```
+Network Exposure Audit — Landscape
+═══════════════════════════════════
+Account: 123456789012 (acme-prod)
+
+  Region          SGs    LBs    EIPs   RDS    EKS
+  ──────────────  ─────  ─────  ─────  ─────  ─────
+  ap-south-1      75     14     25     6      1
+  us-east-1       12     3      4      1      0
+  eu-west-1       8      2      2      0      0
+
+  S3 Buckets (global): 47
+
+What scope should I audit?
+  a) Full audit — all regions, all resource types
+  b) Specific regions
+  c) Specific focus (just SGs, just S3, etc.)
+```
+
+---
+
+## Step 3: Wait for Your Scope Selection
+
+I'd **stop here and wait**. The skill requires your explicit scope confirmation before any investigator is spawned.
+
+---
+
+Once you confirm scope, I'd proceed to Steps 4–7: spawn the `aws-network-exposure` team (devil's advocate + infra/data/k8s investigators), compile DA-confirmed findings into a report, run the validator, and present the full exposure assessment.
+
+**To actually run this:** confirm which profile is your production account and I'll execute the real preflight now.
+
+ASSERTIONS TO CHECK:
+["Detects available AWS profiles from preflight", "Presents profiles for user selection", "Uses the chosen profile for all aws commands", "Passes the profile to all investigators"]
+
+For each assertion, output exactly one line:
+PASS|<assertion text>|<brief reason>
+or
+FAIL|<assertion text>|<brief reason>
+
+Output ONLY scored lines. One per assertion. Nothing else.

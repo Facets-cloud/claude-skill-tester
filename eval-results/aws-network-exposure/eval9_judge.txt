@@ -1,0 +1,4 @@
+PASS|Recognizes internet-facing ALB for a website is intentional|Explicitly states "doing exactly what it's supposed to do" and distinguishes intentional from accidental exposure
+PASS|Does NOT flag it as a vulnerability|Clearly states "not a finding requiring remediation" and rates risk as low
+PASS|Still checks for WAF attachment and TLS configuration|Provides specific CLI commands and checklist items for WAF and TLS verification
+PASS|Assesses defense-in-depth layers rather than just exposure|Checks security groups, WAF, TLS, target reachability, and backend exposure — multiple defense layers evaluated

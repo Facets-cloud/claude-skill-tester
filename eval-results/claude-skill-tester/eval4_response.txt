@@ -1,76 +1,62 @@
-I'll proceed directly to your skill question since flow commands need approval.
+Since flow commands need approval, let me address the actual question directly. The skill instructs me to **start with `eval-skill` (unit testing)** since this is a trigger/invocation issue — not a real infrastructure issue.
 
 ---
 
-Here's exactly what I would do to diagnose why `'check my network'` isn't triggering your skill:
+## Diagnosis: Skill Not Triggering on "check my network"
 
-## Step 1: Inspect the skill's trigger list
+This is a **trigger mismatch** — a unit test problem. Here's exactly what I'd do:
 
-```bash
-cat /path/to/your-skill/skill.md | grep -A 10 "triggers:"
-```
+### Step 1: Check the skill's `triggers:` list
 
-**What I'm looking for:** Whether `"check my network"` (or close variants) appear in the `triggers:` array. Skills only trigger when the user's message semantically matches a trigger. If it's missing, that's the fix.
+I'd read the skill file and look for the `triggers:` frontmatter field. The issue is almost certainly one of these:
 
----
+| Root cause | Example |
+|---|---|
+| "check my network" not in triggers list | Triggers only have `"network check"`, `"scan network"` |
+| Triggers are too narrow/literal | No fuzzy match for paraphrase |
+| Skill has no triggers at all | Relies on description matching only |
 
-## Step 2: Write an eval that captures the failure
+### Step 2: Add a failing eval to confirm
 
-If `evals/evals.json` doesn't exist yet, I'd create it:
+I'd add this to the skill's `evals/evals.json`:
 
 ```json
 {
-  "skill_name": "your-skill",
-  "evals": [
-    {
-      "id": 1,
-      "prompt": "check my network",
-      "assertions": [
-        "The skill triggers and begins network checking",
-        "Does NOT ignore the prompt or respond generically"
-      ]
-    },
-    {
-      "id": 2,
-      "prompt": "what's exposed in my network?",
-      "assertions": ["The skill triggers"]
-    }
+  "id": 99,
+  "prompt": "check my network",
+  "assertions": [
+    "Skill was invoked",
+    "Did NOT ignore the request or respond generically"
   ]
 }
 ```
 
----
-
-## Step 3: Run the eval
-
+Then run:
 ```bash
-bash "$SKILL_DIR/eval-skill.sh" /path/to/your-skill/
+bash "$SKILL_DIR/eval-skill.sh" /path/to/your-skill/ 99
 ```
 
-**Expected failure output:**
-```
-[FAIL] eval 1: skill did not trigger on "check my network"
-  assertion: "The skill triggers and begins network checking" — FAILED
-```
+This would **fail**, confirming the trigger gap.
 
----
+### Step 3: Fix
 
-## Step 4: The likely fix
-
-Add the missing trigger to the skill frontmatter:
+Add the missing trigger variants to the skill's frontmatter:
 
 ```yaml
-triggers: ["check my network", "network check", "audit my network", "what's on my network"]
+triggers:
+  - "check my network"
+  - "check network"
+  - "network check"
+  - "scan my network"
+  - "audit network"
+```
+
+### Step 4: Rerun eval to confirm green
+
+```bash
+bash "$SKILL_DIR/eval-skill.sh" /path/to/your-skill/ 99
 ```
 
 ---
 
-## Step 5: Rerun eval to confirm
-
-```bash
-bash "$SKILL_DIR/eval-skill.sh" /path/to/your-skill/
-```
-
-If it passes, the trigger mismatch was the issue. If it still fails, I'd run the integration test to see if the skill logic itself is broken after triggering.
-
-**Most likely root cause:** `"check my network"` simply isn't in the `triggers:` list. Can you share the skill file so I can confirm?
+**To help you fix this now:** which skill is it? Share the skill file (or its `triggers:` section) and I'll patch it directly.

@@ -143,6 +143,6 @@ done — commit the skill
 ---SKILL END---
 
 The user says:
-Run evals on the k8s-debug skill in ~/devops-skills/skills/k8s-debug/
+Run unit test evals on the k8s-debug skill in ~/devops-skills/skills/k8s-debug/
 
 Respond as the skill instructs. Since you cannot actually run commands, describe exactly what you WOULD do — what commands you'd run, what you'd look for, what your reasoning and output would be.

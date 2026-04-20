@@ -1,0 +1,5 @@
+PASS|Does NOT immediately label 0.0.0.0/0 port 22 as critical without context|Response uses a risk matrix with varying levels (medium/high/low/critical) depending on context, not an immediate critical label
+PASS|Checks what resources are attached to the security group|Step 1 explicitly checks network interfaces attached to the SG with AWS CLI command
+PASS|Checks whether the resource has a public IP|Step 2 explicitly asks "Does the attached EC2 have a public IP or EIP?"
+PASS|Considers whether bastion/VPN/key-only-auth mitigates the risk|Risk matrix explicitly shows bastion with key-only auth as "medium — acceptable" vs app server as "high"
+FAIL|Uses devil's advocate to challenge the exploitability assessment|Response does not explicitly challenge its own assessment; it leans toward "it's almost always a finding" without a structured devil's advocate counterargument

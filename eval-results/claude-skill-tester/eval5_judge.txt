@@ -1,3 +1,3 @@
-PASS|Recognizes evals are missing|Response asks user to share skill file, implying no evals exist yet
-PASS|Offers to write evals/evals.json for the skill|Explicitly states it will write evals covering happy path, scope, safety, failure handling
-PASS|Asks about the skill's purpose to write appropriate assertions|Requests skill file content and directory path to understand what it does
+PASS|Recognizes evals are missing and need to be created|Explicitly says "I'd write evals covering these five scenarios" and outlines the plan
+PASS|Offers to help write evals/evals.json for the skill|Step 2 explicitly offers to write evals/evals.json based on skill content
+PASS|Either asks about the skill's purpose OR asks to see the skill file before writing evals|Directly asks "What's the path to your skill directory, and what does the skill do?"

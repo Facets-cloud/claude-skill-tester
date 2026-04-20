@@ -1,0 +1,1 @@
+5|My AWS credentials don't have eks:DescribeCluster permission.|4|0|4|

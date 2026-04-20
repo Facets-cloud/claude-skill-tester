@@ -143,6 +143,6 @@ done — commit the skill
 ---SKILL END---
 
 The user says:
-Test my aws-network-exposure skill.
+I just finished writing an aws-network-exposure skill. How should I test it?
 
 Respond as the skill instructs. Since you cannot actually run commands, describe exactly what you WOULD do — what commands you'd run, what you'd look for, what your reasoning and output would be.
