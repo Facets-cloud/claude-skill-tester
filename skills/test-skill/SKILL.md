@@ -7,12 +7,7 @@ version: "1.0"
 
 # Skill Tester
 
-You have two tools for testing Claude Code skills. The scripts live at `$SKILL_DIR/../../` (the plugin root). Use them after writing or modifying a skill.
-
-Set this at the start:
-```bash
-TESTER_HOME="$SKILL_DIR/../.."
-```
+You have two tools for testing Claude Code skills. Both scripts are bundled with this skill at `$SKILL_DIR/`. Use them after writing or modifying a skill.
 
 ## When to use what
 
@@ -25,7 +20,7 @@ TESTER_HOME="$SKILL_DIR/../.."
 Tests skill behavior without real infrastructure. Needs `evals/evals.json` in the skill directory.
 
 ```bash
-bash "$TESTER_HOME/eval-skill.sh" /path/to/skills/my-skill/
+bash "$SKILL_DIR/eval-skill.sh" /path/to/skills/my-skill/
 ```
 
 If the skill doesn't have `evals/evals.json`, write one first. Each eval has a prompt and assertions:
@@ -56,22 +51,22 @@ Spawns another Claude session that runs the skill against real infrastructure. Y
 
 ```bash
 # Start a session pointing at the skill's repo
-bash "$TESTER_HOME/claude-skill-tester.sh" start \
+bash "$SKILL_DIR/claude-skill-tester.sh" start \
   --dir /path/to/skill/repo \
   --env "AWS_PROFILE=prod"
 
 # Send a natural prompt — like a user would
-bash "$TESTER_HOME/claude-skill-tester.sh" say "what's exposed to the internet in my AWS account?"
+bash "$SKILL_DIR/claude-skill-tester.sh" say "what's exposed to the internet in my AWS account?"
 
 # Continue if the skill asks for input
-bash "$TESTER_HOME/claude-skill-tester.sh" say "prod profile. full audit."
+bash "$SKILL_DIR/claude-skill-tester.sh" say "prod profile. full audit."
 
 # Read results
-bash "$TESTER_HOME/claude-skill-tester.sh" history
-bash "$TESTER_HOME/claude-skill-tester.sh" cost
+bash "$SKILL_DIR/claude-skill-tester.sh" history
+bash "$SKILL_DIR/claude-skill-tester.sh" cost
 
 # Kill if stuck
-bash "$TESTER_HOME/claude-skill-tester.sh" kill
+bash "$SKILL_DIR/claude-skill-tester.sh" kill
 ```
 
 You see the test session working in real-time:
