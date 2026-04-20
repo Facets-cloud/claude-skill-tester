@@ -7,27 +7,25 @@ version: "1.0"
 
 # Skill Tester
 
-You have two tools for testing Claude Code skills. Use them after writing or modifying a skill.
+You have two tools for testing Claude Code skills. The scripts live at `$SKILL_DIR/../../` (the plugin root). Use them after writing or modifying a skill.
+
+Set this at the start:
+```bash
+TESTER_HOME="$SKILL_DIR/../.."
+```
 
 ## When to use what
 
-- **Wrote a new skill or changed one?** Run `eval-skill` first (fast, catches logic bugs), then `claude-skill-tester` if it needs real infrastructure testing.
+- **Wrote a new skill or changed one?** Run eval-skill first (fast, catches logic bugs), then claude-skill-tester if it needs real infrastructure testing.
 - **User says "test this skill"?** Figure out if they want unit tests (eval) or a live run (integration). Ask if unclear.
-- **Skill failed in production?** Use `claude-skill-tester` to reproduce, read the history, identify the issue, fix, retest.
+- **Skill failed in production?** Use claude-skill-tester to reproduce, read the history, identify the issue, fix, retest.
 
-## Tool 1: Unit Testing — `eval-skill`
+## Tool 1: Unit Testing — eval-skill
 
 Tests skill behavior without real infrastructure. Needs `evals/evals.json` in the skill directory.
 
 ```bash
-# Test all skills in a directory
-bash "$SKILL_DIR/eval-skill.sh" /path/to/skills/
-
-# Test one skill
-bash "$SKILL_DIR/eval-skill.sh" /path/to/skills/my-skill/
-
-# Test one scenario
-bash "$SKILL_DIR/eval-skill.sh" /path/to/skills/my-skill/ 3
+bash "$TESTER_HOME/eval-skill.sh" /path/to/skills/my-skill/
 ```
 
 If the skill doesn't have `evals/evals.json`, write one first. Each eval has a prompt and assertions:
@@ -50,30 +48,33 @@ If the skill doesn't have `evals/evals.json`, write one first. Each eval has a p
 
 Cover: happy path, scope handling, out-of-scope rejection, safety (refuses destructive ops), failure handling (missing creds).
 
-After running, read the results. If assertions fail, fix the skill and rerun.
+After running, read the results. If assertions fail, read the skill, fix the behavior, and rerun.
 
-## Tool 2: Integration Testing — `claude-skill-tester`
+## Tool 2: Integration Testing — claude-skill-tester
 
 Spawns another Claude session that runs the skill against real infrastructure. You see every tool call, agent spawn, and error in real-time.
 
-### Step 1: Start a session pointing at the skill repo
-
 ```bash
-bash "$SKILL_DIR/claude-skill-tester.sh" start \
+# Start a session pointing at the skill's repo
+bash "$TESTER_HOME/claude-skill-tester.sh" start \
   --dir /path/to/skill/repo \
-  --env "AWS_PROFILE=prod" \
-  --env "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1"
+  --env "AWS_PROFILE=prod"
+
+# Send a natural prompt — like a user would
+bash "$TESTER_HOME/claude-skill-tester.sh" say "what's exposed to the internet in my AWS account?"
+
+# Continue if the skill asks for input
+bash "$TESTER_HOME/claude-skill-tester.sh" say "prod profile. full audit."
+
+# Read results
+bash "$TESTER_HOME/claude-skill-tester.sh" history
+bash "$TESTER_HOME/claude-skill-tester.sh" cost
+
+# Kill if stuck
+bash "$TESTER_HOME/claude-skill-tester.sh" kill
 ```
 
-Set `--dir` to the directory where the skill lives. Add `--env` for any environment variables the skill needs.
-
-### Step 2: Send a natural prompt
-
-```bash
-bash "$SKILL_DIR/claude-skill-tester.sh" say "what's exposed to the internet in my AWS account?"
-```
-
-This blocks and streams what the test session is doing:
+You see the test session working in real-time:
 
 ```
 [TOOL] Bash: bash preflight.sh
@@ -83,35 +84,7 @@ This blocks and streams what the test session is doing:
 [DONE] success — 42 turns, $5.94
 ```
 
-### Step 3: Continue the conversation if the skill asks for input
-
-```bash
-bash "$SKILL_DIR/claude-skill-tester.sh" say "prod profile. full audit."
-```
-
-### Step 4: Read the results
-
-```bash
-bash "$SKILL_DIR/claude-skill-tester.sh" history   # full conversation
-bash "$SKILL_DIR/claude-skill-tester.sh" cost       # API cost
-```
-
-### Step 5: Analyze and fix
-
-Read the history output. Look for:
-- Did the skill follow its steps in order?
-- Did the DA actually review findings, or were they bypassed?
-- Were there errors in the stream?
-- Did the report validator run?
-- Is the score defensible?
-
-Fix the skill based on what you found, then retest:
-
-```bash
-bash "$SKILL_DIR/claude-skill-tester.sh" kill
-bash "$SKILL_DIR/claude-skill-tester.sh" start --dir /path/to/skill/repo --env "AWS_PROFILE=prod"
-bash "$SKILL_DIR/claude-skill-tester.sh" say "same prompt again"
-```
+After the test, read the history, analyze what went wrong, fix the skill, and retest.
 
 ## The Feedback Loop
 

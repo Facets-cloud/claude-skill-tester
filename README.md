@@ -1,100 +1,73 @@
 # Claude Skill Tester
 
-Test Claude Code skills using Claude. Install this as a skill, then ask Claude to test your other skills — it runs unit tests, spawns live integration sessions, and tells you what broke.
+Test Claude Code skills using Claude. Install this as a plugin, then ask Claude to test your skills — it runs unit tests, spawns live sessions against real infrastructure, analyzes what broke, and fixes the skill.
 
 ## Install
 
 ```bash
-# As a Claude Code plugin (recommended)
+# As a Claude Code plugin
 claude /plugin add Facets-cloud/claude-skill-tester
-
-# Or clone and symlink
-git clone https://github.com/Facets-cloud/claude-skill-tester.git
-mkdir -p ~/.claude/skills && ln -sf "$(pwd)/claude-skill-tester/SKILL.md" ~/.claude/skills/test-skill/SKILL.md
 ```
 
-Requires: `claude` CLI, `jq`, `python3`
+That's it. Claude now has a `test-skill` skill that knows how to use `eval-skill.sh` and `claude-skill-tester.sh`.
 
-## What It Does
+## How It Works
 
-Once installed, you talk to Claude naturally:
+You're developing skills in some directory. You tell Claude:
 
-> "Test my aws-network-exposure skill"
+> "Run evals on my aws-network-exposure skill"
 
-> "Run evals on the k8s-debug skill in ~/devops-skills/skills/k8s-debug/"
-
-> "Integration test the cost-leak skill against our prod AWS account"
-
-> "The DA keeps getting skipped — can you test why?"
-
-Claude figures out what kind of testing you need and runs it.
-
-## Two Kinds of Tests
-
-### Unit Tests — "does the skill behave correctly?"
-
-Claude loads your skill, sends test prompts to another Claude, and a judge checks whether the responses meet your assertions. No real infrastructure needed.
+Claude runs unit tests — sends test prompts to another Claude with your skill loaded, judges whether responses meet your assertions, and reports what passed and failed:
 
 ```
-You: "run evals on my network-exposure skill"
+#1  What's exposed to the internet?        PASS (6/6)
+#2  Open SG on port 22. Is that bad?       FAIL (4/5)
+#6  Find unused resources (out of scope)   FAIL (2/4)
 
-Claude runs eval-skill.sh → 12 scenarios, 4 in parallel:
+Score: 10/12 passed (94.4%)
 
-  #1  What's exposed to the internet?        PASS (6/6)
-  #2  Open SG on port 22. Is that bad?       FAIL (4/5)
-  #3  Are any S3 buckets public?             PASS (5/5)
-  #6  Find unused resources (out of scope)   FAIL (2/4)
-  ...
-  Score: 10/12 passed (94.4%)
-
-  Failures:
-  - #2: Skill labels port 22 as critical without checking context
-  - #6: Skill attempts cost optimization instead of redirecting
+Failures:
+- #2: Skill labels port 22 as critical without checking context
+- #6: Skill attempts cost optimization instead of redirecting
 ```
 
-### Integration Tests — "does it work against real infrastructure?"
+Claude reads the failures, opens the skill, fixes the behavior, and reruns.
 
-Claude spawns another Claude session with your skill loaded, real AWS/K8s credentials, and sends prompts as a user would. You see every tool call, agent spawn, and error streamed back.
+> "Integration test the network-exposure skill against frammer's AWS account"
 
-```
-You: "test the network-exposure skill against frammer's AWS account"
-
-Claude starts a test session and streams what happens:
-
-  [TOOL] Bash: bash preflight.sh aws-network-exposure
-  [CLAUDE] Preflight passed. Found EKS cluster.
-  [TOOL] TeamCreate: Network exposure audit
-  [TOOL] Agent: investigator-infra-exposure
-  [TOOL] Agent: Devil's advocate
-  [CLAUDE] Team is live. Four agents working.
-  ...
-  [CLAUDE] Score: 38/100. 3 critical findings.
-  [DONE] 42 turns, $5.94
-
-Claude then reads the conversation history and tells you:
-  - DA review was skipped (investigators wrote to /tmp instead of messaging DA)
-  - Validator never ran
-  - Survey wasn't shown to user before spawning team
-```
-
-## The Feedback Loop
+Claude spawns another Claude session with real AWS credentials, sends it prompts like a user would, and streams what happens:
 
 ```
-Write skill
-    │
-    ▼
-"run evals on my skill" ── pass? ── no → Claude tells you what failed, you fix
-    │ yes
-    ▼
-"integration test against prod" ── works? ── no → Claude analyzes the stream, you fix
-    │ yes
-    ▼
-ship it
+[TOOL] Bash: bash preflight.sh aws-network-exposure
+[TOOL] TeamCreate: Network exposure audit
+[TOOL] Agent: investigator-infra-exposure
+[TOOL] Agent: Devil's advocate
+[CLAUDE] Team is live. Four agents working.
+[ERROR] structured messages cannot be broadcast (to: "*")
+[CLAUDE] Score: 38/100. 3 critical findings.
+[DONE] 42 turns, $5.94
 ```
 
-This is how every skill in [devops-skills](https://github.com/Facets-cloud/devops-skills) was built and tested.
+Claude reads the stream, spots that the DA was skipped and the broadcast failed, fixes the skill, and retests.
 
-## Writing Evals for Your Skill
+## The Loop
+
+```
+Write skill → Claude tests it → Claude fixes what broke → Claude retests
+                                        │
+                                        └──→ repeat until clean
+```
+
+Two layers of testing:
+
+| Unit tests (eval-skill) | Integration tests (claude-skill-tester) |
+|---|---|
+| Does the skill respond correctly? | Does it work against real infra? |
+| Does it refuse destructive requests? | Does the DA actually review findings? |
+| Does it redirect out-of-scope? | Do teams spawn and communicate correctly? |
+| Fast, no real infrastructure | Slower, needs real AWS/K8s credentials |
+
+## Writing Evals
 
 Create `evals/evals.json` next to your `SKILL.md`:
 
@@ -114,19 +87,9 @@ Create `evals/evals.json` next to your `SKILL.md`:
 }
 ```
 
-Aim for 8-12 scenarios covering:
+Aim for 8-12 scenarios. Test the happy path, nuance, boundaries, safety, and failure handling. Assertions test behavior, not exact wording.
 
-| | |
-|---|---|
-| **Happy path** | Does the core flow work? |
-| **Judgment** | Catches nuance (not every open port is a vuln) |
-| **Boundaries** | Redirects out-of-scope requests |
-| **Safety** | Refuses destructive operations |
-| **Failure** | Handles missing creds / tools gracefully |
-
-Assertions test behavior, not wording. "Asks for clarification" not "Says 'could you clarify'".
-
-See `examples/my-skill/` for a minimal working example.
+See `examples/my-skill/` for a minimal example.
 
 ## License
 

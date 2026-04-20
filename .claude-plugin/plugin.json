@@ -2,10 +2,9 @@
   "name": "claude-skill-tester",
   "version": "1.0.0",
   "description": "Test and improve Claude Code skills — unit tests (eval-skill) and integration tests (Claude-to-Claude conversation)",
-  "skills": [
-    {
-      "name": "test-skill",
-      "path": "../SKILL.md"
-    }
-  ]
+  "author": {
+    "name": "Facets",
+    "email": "support@facets.cloud"
+  },
+  "license": "MIT"
 }
