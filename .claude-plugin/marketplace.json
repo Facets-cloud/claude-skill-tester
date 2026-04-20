@@ -1,0 +1,6 @@
+{
+  "name": "claude-skill-tester",
+  "repo": "Facets-cloud/claude-skill-tester",
+  "description": "Test and improve Claude Code skills with unit tests and Claude-to-Claude integration tests",
+  "tags": ["skills", "testing", "evals", "development"]
+}

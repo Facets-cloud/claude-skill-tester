@@ -3,7 +3,7 @@
 A feedback loop for developing Claude Code skills. Two tools:
 
 - **`eval-skill`** — unit test your skill. Does it respond correctly to prompts? Does it refuse out-of-scope requests? Does it ask before acting?
-- **`claude-skill-tester`** — integration test your skill. One Claude session talks to another Claude session running your skill against real infrastructure. You watch what happens, fix the skill, retest.
+- **`claude-skill-tester`** — integration test your skill. Your Claude session spawns another Claude session that runs the skill against real infrastructure. You watch what happens, fix the skill, retest.
 
 ```
 Write skill → eval-skill (unit test) → claude-skill-tester (integration test)
@@ -124,53 +124,84 @@ Create `evals/evals.json` in your skill directory:
 
 ## Integration Testing Skills — `claude-skill-tester`
 
-For when unit tests pass but you need to see how the skill behaves against real infrastructure. One Claude session (yours) talks to another Claude session (running the skill), and you see everything that happens — every tool call, every agent spawn, every error.
+For when unit tests pass but you need to see how the skill behaves against real infrastructure. Your Claude session spawns another Claude session, sends it prompts as a user would, and streams back everything that happens — every tool call, every agent spawn, every error.
 
-### Start a session
+### How it works
 
-```bash
-claude-skill-tester start \
-  --dir ~/my-skills-repo \
-  --env "AWS_PROFILE=prod" \
-  --env "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1"
+You're in a Claude Code session. You ask Claude to test a skill. Claude uses `claude-skill-tester` to talk to another Claude that has the skill loaded:
+
+```
+┌─────────────────────────────┐     ┌─────────────────────────────┐
+│  Your Claude session        │     │  Test Claude session        │
+│                             │     │                             │
+│  "test my network-exposure  │     │  (has the skill loaded,     │
+│   skill against prod"       │     │   real AWS creds,           │
+│         │                   │     │   teams mode enabled)       │
+│         ▼                   │     │         │                   │
+│  claude-skill-tester start  │     │         │                   │
+│  claude-skill-tester say    │────▶│  receives prompt            │
+│         │                   │     │  triggers skill             │
+│         │                   │     │  runs preflight             │
+│    streams back:            │◀────│  spawns team                │
+│    [TOOL] Bash: aws ec2...  │     │  investigators run          │
+│    [TOOL] TeamCreate        │     │  DA challenges              │
+│    [CLAUDE] Found 3 SGs...  │     │  compiles report            │
+│    [DONE] 42 turns, $5.94   │     │         │                   │
+│         │                   │     │         ▼                   │
+│  "analyze what went wrong"  │     │  done                       │
+│  reads history, fixes skill │     │                             │
+└─────────────────────────────┘     └─────────────────────────────┘
 ```
 
-### Talk to it like a user
+### Example conversation
+
+You tell your Claude session:
+
+> "Test the aws-network-exposure skill against the frammer AWS account. Use profile frammer."
+
+Your Claude runs:
 
 ```bash
+claude-skill-tester start --dir ~/devops-skills --env "AWS_PROFILE=frammer" --env "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1"
 claude-skill-tester say "what's exposed to the internet in my AWS account?"
 ```
 
-You see the skill working in real-time:
+You see the test session working in real-time:
 
 ```
-[TOOL] Bash: aws ec2 describe-security-groups --filters ...
+[TOOL] Bash: bash preflight.sh aws-network-exposure
+[CLAUDE] Preflight passed. Found EKS cluster frammer-app-nonprod.
+[CLAUDE] Which profile should I audit?
+[DONE] success — 5 turns, $0.30
+```
+
+Your Claude continues:
+
+```bash
+claude-skill-tester say "frammer. full audit all regions."
+```
+
+```
 [TOOL] TeamCreate: Network exposure audit
 [TOOL] Agent: investigator-infra-exposure
+[TOOL] Agent: investigator-data-exposure
+[TOOL] Agent: investigator-k8s-exposure
 [TOOL] Agent: Devil's advocate
 [CLAUDE] Team is live. Four agents working in parallel.
-[ERROR] structured messages cannot be broadcast (to: "*")
-[CLAUDE] Found 3 critical findings...
+...
+[TOOL] Write: network-exposure/reports/report-2026-04-17_1735.md
+[CLAUDE] Score: 38/100 (D). 3 critical findings.
 [DONE] success — 42 turns, $5.94
 ```
 
-### Continue the conversation
-
-```bash
-claude-skill-tester say "frammer profile. full audit."
-```
-
-Each `say` resumes the same Claude session. Multi-turn works automatically.
-
-### Review what happened
+Then your Claude reads the history, analyzes what went wrong, and fixes the skill:
 
 ```bash
 claude-skill-tester history    # full conversation
-claude-skill-tester cost       # how much it cost
-claude-skill-tester kill       # stop if stuck
+claude-skill-tester cost       # total API cost
 ```
 
-### Dig into raw events
+### Analyzing raw events
 
 ```bash
 # All errors
@@ -179,6 +210,17 @@ claude-skill-tester stream | jq 'select(.type == "user") | select(.message.conte
 # All tool calls
 claude-skill-tester stream | jq 'select(.type == "assistant") | .message.content[-1] | select(.type == "tool_use") | {tool: .name, cmd: .input.command // .input.skill // .input.description}'
 ```
+
+### Commands
+
+| Command | What it does |
+|---|---|
+| `start --dir <path> --env K=V` | Point at your skill repo with env vars |
+| `say "prompt"` | Send prompt to test session, stream response |
+| `history` | Full conversation log |
+| `stream` | Raw JSON events from last turn |
+| `cost` | Total API cost |
+| `kill` | Stop a stuck session |
 
 ---
 
@@ -203,7 +245,7 @@ claude-skill-tester stream | jq 'select(.type == "assistant") | .message.content
 └──────────────────────────────────────────────────┘
 ```
 
-**Common things you catch at each layer:**
+**What each layer catches:**
 
 | `eval-skill` catches | `claude-skill-tester` catches |
 |---|---|
@@ -213,7 +255,7 @@ claude-skill-tester stream | jq 'select(.type == "assistant") | .message.content
 | Not redirecting out-of-scope | Inflated scores (counting noise as automation) |
 | Missing clarifying questions | Validator never running |
 
-The unit tests catch logic. The integration tests catch architecture.
+Unit tests catch logic. Integration tests catch architecture.
 
 ---
 
