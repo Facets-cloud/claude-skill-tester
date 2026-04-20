@@ -1,6 +1,15 @@
 {
   "name": "claude-skill-tester",
-  "repo": "Facets-cloud/claude-skill-tester",
-  "description": "Test and improve Claude Code skills with unit tests and Claude-to-Claude integration tests",
-  "tags": ["skills", "testing", "evals", "development"]
+  "description": "Test and improve Claude Code skills",
+  "owner": {
+    "name": "Facets",
+    "email": "support@facets.cloud"
+  },
+  "plugins": [
+    {
+      "name": "claude-skill-tester",
+      "description": "Unit test skills with eval-skill, integration test with Claude-to-Claude sessions",
+      "source": "./"
+    }
+  ]
 }

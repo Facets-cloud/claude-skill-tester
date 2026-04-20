@@ -1,8 +1,6 @@
 ---
-title: "Skill Tester"
-description: "Test and improve Claude Code skills. Unit test with eval-skill (LLM-judged assertions). Integration test with claude-skill-tester (Claude-to-Claude conversation against real infrastructure). Use after writing or modifying a skill."
-triggers: ["test skill", "eval skill", "test my skill", "run evals", "skill test", "does this skill work", "try the skill", "integration test", "skill feedback loop", "improve this skill", "fine tune skill"]
-version: "1.0"
+name: test-skill
+description: "Test and improve Claude Code skills. Use when user says test skill, eval skill, run evals, test my skill, does this skill work, integration test, skill feedback loop, improve skill, fine tune skill. Unit test with eval-skill (LLM-judged assertions). Integration test with claude-skill-tester (Claude-to-Claude conversation against real infrastructure)."
 ---
 
 # Skill Tester

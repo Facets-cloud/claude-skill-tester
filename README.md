@@ -4,12 +4,12 @@ Test Claude Code skills using Claude. Install this as a plugin, then ask Claude 
 
 ## Install
 
-```bash
-# As a Claude Code plugin
-claude /plugin add Facets-cloud/claude-skill-tester
-```
+In Claude Code:
 
-That's it. Claude now has a `test-skill` skill that knows how to use `eval-skill.sh` and `claude-skill-tester.sh`.
+```
+/plugin marketplace add Facets-cloud/claude-skill-tester
+/plugin install claude-skill-tester@claude-skill-tester
+```
 
 ## How It Works
 
