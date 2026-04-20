@@ -7,23 +7,38 @@ version: "1.0"
 
 # Skill Tester
 
-You have two tools for testing Claude Code skills. Both scripts are bundled with this skill at `$SKILL_DIR/`. Use them after writing or modifying a skill.
+You have two testing tools bundled at `$SKILL_DIR/`. Your job is to test a skill, figure out what's wrong, fix it, and confirm the fix works.
 
-## When to use what
+## The two tools
 
-- **Wrote a new skill or changed one?** Run eval-skill first (fast, catches logic bugs), then claude-skill-tester if it needs real infrastructure testing.
-- **User says "test this skill"?** Figure out if they want unit tests (eval) or a live run (integration). Ask if unclear.
-- **Skill failed in production?** Use claude-skill-tester to reproduce, read the history, identify the issue, fix, retest.
-
-## Tool 1: Unit Testing — eval-skill
-
-Tests skill behavior without real infrastructure. Needs `evals/evals.json` in the skill directory.
+**`eval-skill.sh`** — unit tests. Sends test prompts to a Claude with the skill loaded, then a judge checks if assertions pass. Fast, no real infrastructure. Needs `evals/evals.json` in the skill directory — if it doesn't exist, write one before testing.
 
 ```bash
-bash "$SKILL_DIR/eval-skill.sh" /path/to/skills/my-skill/
+bash "$SKILL_DIR/eval-skill.sh" /path/to/skill/
 ```
 
-If the skill doesn't have `evals/evals.json`, write one first. Each eval has a prompt and assertions:
+**`claude-skill-tester.sh`** — integration tests. Spawns another Claude session with the skill loaded and real credentials. You send it prompts like a user would and see every tool call, agent spawn, and error streamed back. Use this when unit tests pass but you need to see how the skill actually behaves.
+
+```bash
+bash "$SKILL_DIR/claude-skill-tester.sh" start --dir /path/to/repo --env "KEY=VAL"
+bash "$SKILL_DIR/claude-skill-tester.sh" say "natural user prompt"
+bash "$SKILL_DIR/claude-skill-tester.sh" say "follow-up if skill asks"
+bash "$SKILL_DIR/claude-skill-tester.sh" history
+bash "$SKILL_DIR/claude-skill-tester.sh" cost
+bash "$SKILL_DIR/claude-skill-tester.sh" kill
+```
+
+## How to think about testing
+
+Unit tests and integration tests catch different things. Unit tests catch logic — does the skill trigger, does it refuse destructive requests, does it redirect out-of-scope? Integration tests catch architecture — does the DA actually review findings, do agents communicate correctly, does the validator run?
+
+If you're not sure which to run, start with unit tests. They're faster and cheaper. If they pass and the user still reports problems, move to integration.
+
+When a test fails, read the failure carefully. The problem is usually in the skill, not the assertion. Read the skill definition, understand why it produced the wrong behavior, fix it, and rerun. Don't weaken assertions to make them pass — fix the skill.
+
+## Writing evals
+
+If the skill doesn't have `evals/evals.json`, write one. Think about what matters for this specific skill — not a generic checklist, but what would actually go wrong if the skill misbehaves.
 
 ```json
 {
@@ -31,77 +46,27 @@ If the skill doesn't have `evals/evals.json`, write one first. Each eval has a p
   "evals": [
     {
       "id": 1,
-      "prompt": "Natural user prompt that should trigger the skill",
+      "prompt": "Natural prompt a real user would say",
       "assertions": [
-        "Does the right thing",
-        "Does NOT do the wrong thing"
+        "What the skill should do",
+        "What the skill should NOT do"
       ]
     }
   ]
 }
 ```
 
-Cover: happy path, scope handling, out-of-scope rejection, safety (refuses destructive ops), failure handling (missing creds).
+Good assertions test behavior and judgment, not exact wording. "Asks for clarification before acting" not "Says the words 'could you clarify'". Test what matters — if the skill audits security, test that it catches real risks AND that it doesn't cry wolf on intentional exposure.
 
-After running, read the results. If assertions fail, read the skill, fix the behavior, and rerun.
+## Analyzing integration test results
 
-## Tool 2: Integration Testing — claude-skill-tester
+After an integration test, read the history and the stream. The stream shows raw events — tool calls, errors, agent spawns. Look for patterns:
 
-Spawns another Claude session that runs the skill against real infrastructure. You see every tool call, agent spawn, and error in real-time.
+- Agents writing findings to temp files instead of communicating through the team
+- Steps being skipped (validator not running, DA not reviewing)
+- Errors from tools the skill assumed existed
+- The skill asking the wrong questions or skipping user confirmation
 
-```bash
-# Start a session pointing at the skill's repo
-bash "$SKILL_DIR/claude-skill-tester.sh" start \
-  --dir /path/to/skill/repo \
-  --env "AWS_PROFILE=prod"
+The history shows the conversation. Read it like you're the user — does the skill's behavior make sense? Would you trust its output? Would you know what to do with the report?
 
-# Send a natural prompt — like a user would
-bash "$SKILL_DIR/claude-skill-tester.sh" say "what's exposed to the internet in my AWS account?"
-
-# Continue if the skill asks for input
-bash "$SKILL_DIR/claude-skill-tester.sh" say "prod profile. full audit."
-
-# Read results
-bash "$SKILL_DIR/claude-skill-tester.sh" history
-bash "$SKILL_DIR/claude-skill-tester.sh" cost
-
-# Kill if stuck
-bash "$SKILL_DIR/claude-skill-tester.sh" kill
-```
-
-You see the test session working in real-time:
-
-```
-[TOOL] Bash: bash preflight.sh
-[TOOL] TeamCreate
-[TOOL] Agent: investigator
-[CLAUDE] Found 3 critical findings...
-[DONE] success — 42 turns, $5.94
-```
-
-After the test, read the history, analyze what went wrong, fix the skill, and retest.
-
-## The Feedback Loop
-
-```
-Write/modify skill
-       │
-       ▼
-eval-skill (unit test) ── assertions pass? ── no → fix
-       │ yes
-       ▼
-claude-skill-tester (integration test) ── works against real infra? ── no → fix
-       │ yes
-       ▼
-done — commit the skill
-```
-
-## What each layer catches
-
-| eval-skill (unit) | claude-skill-tester (integration) |
-|---|---|
-| Skill not triggering on prompts | DA being skipped |
-| Wrong scope handling | Investigators bypassing DA |
-| Not refusing destructive requests | Team broadcast errors |
-| Not redirecting out-of-scope | Scores inflated by noise |
-| Missing clarifying questions | Report validator not running |
+Fix what you find, retest until clean.
