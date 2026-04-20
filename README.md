@@ -4,7 +4,13 @@ Test Claude Code skills using Claude. Install this as a plugin, then ask Claude 
 
 ## Install
 
-In Claude Code:
+Paste this in Claude Code and ask it to install:
+
+```
+https://github.com/Facets-cloud/claude-skill-tester
+```
+
+Or run the slash commands directly:
 
 ```
 /plugin marketplace add Facets-cloud/claude-skill-tester
