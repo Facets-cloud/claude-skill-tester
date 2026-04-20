@@ -1,0 +1,49 @@
+I can see the full picture. Here's my diagnosis and what I'd do:
+
+---
+
+**The rule is: fix the skill, not the assertion.**
+
+An assertion saying "Does NOT immediately label as critical" is a behavioral contract — the skill is violating it. Weakening the assertion just hides the bug.
+
+**What I'd do:**
+
+**1. Read the actual response to see what it said**
+```bash
+cat eval-results/<your-skill>/eval3_response.txt
+```
+Look for the exact line where it labels something critical — is it in the opening sentence? First tool call result? That pinpoints *where* in the skill's logic the premature labeling happens.
+
+**2. Read the skill itself**
+```bash
+cat /path/to/your-skill/skill.md  # or wherever it lives
+```
+Look for:
+- Instructions like "classify severity" or "determine risk" that come before any data-gathering step
+- Default severity language baked into prompt templates (e.g. "report all open ports as CRITICAL")
+- A summarization step that happens before investigation is complete
+
+**3. The likely fix**
+
+The skill probably does something like:
+
+```
+Step 1: Identify the issue
+Step 2: Label it critical  ← too early
+Step 3: Gather evidence
+```
+
+Fix: move severity assessment **after** evidence gathering. Add an explicit gate like:
+
+> "Do NOT assign a severity level until you have confirmed X, Y, and Z. Default to 'informational' until evidence supports escalation."
+
+**4. Rerun scenario 3 alone**
+```bash
+bash eval-skill.sh /path/to/skill/ 3
+```
+
+Confirm it passes before running the full suite.
+
+---
+
+The assertion is telling you the truth about your skill. The fix lives in the skill, not the eval.

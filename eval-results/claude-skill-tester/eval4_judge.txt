@@ -1,0 +1,3 @@
+PASS|Recognizes this as a trigger/activation problem|Step 1 and Step 4 explicitly identify missing trigger in triggers list as root cause
+PASS|Suggests running eval-skill to test if the prompt triggers the skill|Step 3 explicitly shows running eval-skill.sh to test the prompt
+PASS|Does NOT immediately jump to integration testing|Integration testing only mentioned as fallback in Step 5 after trigger fix is verified

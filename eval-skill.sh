@@ -1,9 +1,9 @@
 #!/bin/bash
-# eval-skill.sh — LLM-judged evaluation of skill quality
+# eval-skill.sh — LLM-judged evaluation of skill quality (parallel execution)
 #
-# Two-pass evaluation:
-#   1. Sends each eval prompt to Claude with the skill loaded
-#   2. A judge scores whether the response meets each assertion
+# Two-pass evaluation per scenario (runs scenarios in parallel):
+#   1. Sends eval prompt to Claude with the skill loaded
+#   2. A judge scores whether the response meets assertions
 #
 # Usage:
 #   ./eval-skill.sh /path/to/skills/                  # Eval all skills
@@ -14,6 +14,7 @@
 # Environment:
 #   CLAUDE_CMD    Override claude binary (default: claude)
 #   MODEL         Override model (default: sonnet)
+#   PARALLEL      Max parallel evals (default: 4)
 #   DRY_RUN       Set to 1 to print prompts without running
 #   VERBOSE       Set to 1 for full response output
 #   TIMEOUT       Seconds per eval (default: 180)
@@ -29,6 +30,7 @@ NC='\033[0m'
 
 CLAUDE_CMD="${CLAUDE_CMD:-claude}"
 MODEL="${MODEL:-sonnet}"
+PARALLEL="${PARALLEL:-4}"
 DRY_RUN="${DRY_RUN:-0}"
 VERBOSE="${VERBOSE:-0}"
 TIMEOUT="${TIMEOUT:-180}"
@@ -84,26 +86,121 @@ run_claude() {
         return 0
     fi
 
+    local timeout_cmd=""
     if command -v gtimeout &>/dev/null; then
-        TIMEOUT_CMD="gtimeout"
+        timeout_cmd="gtimeout"
     elif command -v timeout &>/dev/null; then
-        TIMEOUT_CMD="timeout"
-    else
-        TIMEOUT_CMD=""
+        timeout_cmd="timeout"
     fi
 
-    if [[ -n "$TIMEOUT_CMD" ]]; then
-        $TIMEOUT_CMD "$TIMEOUT" $CLAUDE_CMD --print \
+    if [[ -n "$timeout_cmd" ]]; then
+        $timeout_cmd "$TIMEOUT" $CLAUDE_CMD --print \
             --model "$MODEL" \
-            --max-turns 3 \
+            --max-turns 8 \
             -p "$(cat "$prompt_file")" > "$output_file" 2>/dev/null || true
     else
         $CLAUDE_CMD --print \
             --model "$MODEL" \
-            --max-turns 3 \
+            --max-turns 8 \
             -p "$(cat "$prompt_file")" > "$output_file" 2>/dev/null || true
     fi
 }
+
+# Run a single eval scenario (both passes). Called as a subprocess.
+# Writes result to $RESULTS_DIR/eval${eval_id}_result.txt
+run_single_eval() {
+    local skill_file="$1"
+    local eval_file="$2"
+    local eval_index="$3"
+    local results_dir="$4"
+
+    local skill_content
+    skill_content=$(cat "$skill_file")
+
+    local eval_id eval_prompt assertions_json assertion_count
+    eval_id=$(json_get "$eval_file" "evals.$eval_index.id")
+    eval_prompt=$(json_get "$eval_file" "evals.$eval_index.prompt")
+    assertions_json=$(json_get "$eval_file" "evals.$eval_index.assertions")
+    assertion_count=$(python3 -c "
+import json
+data = json.load(open('$eval_file'))
+print(len(data['evals'][$eval_index]['assertions']))
+" 2>/dev/null || echo 0)
+
+    local response_file="$results_dir/eval${eval_id}_response.txt"
+    local prompt_file="$results_dir/eval${eval_id}_prompt.txt"
+    local judge_file="$results_dir/eval${eval_id}_judge.txt"
+    local judge_prompt_file="$results_dir/eval${eval_id}_judge_prompt.txt"
+    local result_file="$results_dir/eval${eval_id}_result.txt"
+
+    # ── Pass 1: Run the skill ──
+    cat > "$prompt_file" << SKILLEOF
+You are an AI assistant with the following skill loaded:
+
+---SKILL START---
+$skill_content
+---SKILL END---
+
+The user says:
+$eval_prompt
+
+Respond as the skill instructs. Since you cannot actually run commands, describe exactly what you WOULD do — what commands you'd run, what you'd look for, what your reasoning and output would be.
+SKILLEOF
+
+    run_claude "$prompt_file" "$response_file"
+    local response
+    response=$(cat "$response_file")
+
+    # ── Pass 2: Judge assertions ──
+    cat > "$judge_prompt_file" << JUDGEEOF
+You are an eval judge. Score whether a skill response meets each assertion.
+
+RESPONSE TO EVALUATE:
+$response
+
+ASSERTIONS TO CHECK:
+$assertions_json
+
+For each assertion, output exactly one line:
+PASS|<assertion text>|<brief reason>
+or
+FAIL|<assertion text>|<brief reason>
+
+Output ONLY scored lines. One per assertion. Nothing else.
+JUDGEEOF
+
+    run_claude "$judge_prompt_file" "$judge_file"
+    local judge_output
+    judge_output=$(cat "$judge_file")
+
+    # ── Parse results ──
+    local eval_passed=0 eval_failed=0
+    local fail_details=""
+
+    while IFS='|' read -r verdict assertion reason; do
+        verdict=$(echo "$verdict" | tr -d '[:space:]')
+        case "$verdict" in
+            PASS) ((eval_passed++)) ;;
+            FAIL)
+                ((eval_failed++))
+                fail_details="${fail_details}FAIL|${assertion}|${reason}\n"
+                ;;
+        esac
+    done <<< "$judge_output"
+
+    local scored=$((eval_passed + eval_failed))
+    if [[ $scored -eq 0 ]]; then
+        eval_failed=$assertion_count
+        fail_details="WARN|Judge returned no parseable results|\n"
+    fi
+
+    # Write result file: eval_id|prompt|passed|failed|scored|fail_details
+    echo "${eval_id}|${eval_prompt}|${eval_passed}|${eval_failed}|${scored}|${fail_details}" > "$result_file"
+}
+
+# Export functions and vars for subprocesses
+export -f run_single_eval run_claude json_get json_array_len
+export CLAUDE_CMD MODEL DRY_RUN VERBOSE TIMEOUT
 
 # ─── Discover skills ──────────────────────────────────────
 
@@ -125,7 +222,7 @@ fi
 
 echo "Skill Evaluation"
 echo "======================================================"
-echo "Model: $MODEL | Timeout: ${TIMEOUT}s"
+echo "Model: $MODEL | Timeout: ${TIMEOUT}s | Parallel: $PARALLEL"
 [[ "$DRY_RUN" == "1" ]] && echo -e "${YELLOW}DRY RUN — no LLM calls${NC}"
 echo ""
 
@@ -143,15 +240,55 @@ for skill_dir in "${skill_dirs[@]}"; do
         continue
     fi
 
-    skill_content=$(cat "$skill_file")
     eval_count=$(json_array_len "$eval_file" "evals")
 
     RESULTS_DIR="$RESULTS_BASE/$skill_name"
     mkdir -p "$RESULTS_DIR"
 
-    echo -e "${BLUE}Evaluating: $skill_name ($eval_count scenarios)${NC}"
+    # Build list of eval indices to run
+    eval_indices=()
+    for ((i=0; i<eval_count; i++)); do
+        eval_id=$(json_get "$eval_file" "evals.$i.id")
+        if [[ -n "$TARGET_EVAL" && "$eval_id" != "$TARGET_EVAL" ]]; then
+            continue
+        fi
+        eval_indices+=("$i")
+    done
+
+    if [[ ${#eval_indices[@]} -eq 0 ]]; then
+        echo -e "${DIM}SKIP $skill_name — no matching evals${NC}"
+        continue
+    fi
+
+    echo -e "${BLUE}Evaluating: $skill_name (${#eval_indices[@]} scenarios, $PARALLEL in parallel)${NC}"
     echo ""
 
+    # ── Launch evals in parallel ──
+    pids=()
+    running=0
+
+    for idx in "${eval_indices[@]}"; do
+        eval_id=$(json_get "$eval_file" "evals.$idx.id")
+        eval_prompt=$(json_get "$eval_file" "evals.$idx.prompt")
+        echo -e "  ${DIM}#$eval_id: ${eval_prompt:0:70}... [launching]${NC}"
+
+        run_single_eval "$skill_file" "$eval_file" "$idx" "$RESULTS_DIR" &
+        pids+=("$!:$idx")
+        ((running++))
+
+        # Throttle: wait if we hit the parallel limit
+        if [[ $running -ge $PARALLEL ]]; then
+            # Wait for any one to finish
+            wait -n 2>/dev/null || true
+            ((running--))
+        fi
+    done
+
+    # Wait for all remaining
+    wait 2>/dev/null || true
+
+    # ── Collect results ──
+    echo ""
     skill_passed=0
     skill_failed=0
     report_lines=()
@@ -159,111 +296,43 @@ for skill_dir in "${skill_dirs[@]}"; do
     report_lines+=("")
     report_lines+=("- **Date:** $(date -u '+%Y-%m-%d %H:%M UTC')")
     report_lines+=("- **Model:** $MODEL")
+    report_lines+=("- **Parallel:** $PARALLEL")
     report_lines+=("")
     report_lines+=("| # | Scenario | Result | Score |")
     report_lines+=("| - | -------- | ------ | ----- |")
 
-    for ((i=0; i<eval_count; i++)); do
-        eval_id=$(json_get "$eval_file" "evals.$i.id")
-        eval_prompt=$(json_get "$eval_file" "evals.$i.prompt")
+    for idx in "${eval_indices[@]}"; do
+        eval_id=$(json_get "$eval_file" "evals.$idx.id")
+        result_file="$RESULTS_DIR/eval${eval_id}_result.txt"
 
-        [[ -n "$TARGET_EVAL" && "$eval_id" != "$TARGET_EVAL" ]] && continue
-
-        assertions_json=$(json_get "$eval_file" "evals.$i.assertions")
-        assertion_count=$(python3 -c "
-import json
-data = json.load(open('$eval_file'))
-print(len(data['evals'][$i]['assertions']))
-" 2>/dev/null || echo 0)
-
-        echo -e "  #$eval_id: ${DIM}${eval_prompt:0:70}...${NC}"
-
-        # ── Pass 1: Run the skill ──
-        response_file="$RESULTS_DIR/eval${eval_id}_response.txt"
-        prompt_file="$RESULTS_DIR/eval${eval_id}_prompt.txt"
-
-        cat > "$prompt_file" << SKILLEOF
-You are an AI assistant with the following skill loaded:
-
----SKILL START---
-$skill_content
----SKILL END---
-
-The user says:
-$eval_prompt
-
-Respond as the skill instructs. Since you cannot actually run commands, describe exactly what you WOULD do — what commands you'd run, what you'd look for, what your reasoning and output would be.
-SKILLEOF
-
-        run_claude "$prompt_file" "$response_file"
-        response=$(cat "$response_file")
-
-        [[ "$VERBOSE" == "1" ]] && echo -e "    ${DIM}Response: ${#response} chars${NC}"
-
-        # ── Pass 2: Judge assertions ──
-        judge_file="$RESULTS_DIR/eval${eval_id}_judge.txt"
-        judge_prompt_file="$RESULTS_DIR/eval${eval_id}_judge_prompt.txt"
-
-        cat > "$judge_prompt_file" << JUDGEEOF
-You are an eval judge. Score whether a skill response meets each assertion.
-
-RESPONSE TO EVALUATE:
-$response
-
-ASSERTIONS TO CHECK:
-$assertions_json
-
-For each assertion, output exactly one line:
-PASS|<assertion text>|<brief reason>
-or
-FAIL|<assertion text>|<brief reason>
-
-Output ONLY scored lines. One per assertion. Nothing else.
-JUDGEEOF
-
-        run_claude "$judge_prompt_file" "$judge_file"
-        judge_output=$(cat "$judge_file")
-
-        # ── Parse results ──
-        eval_passed=0
-        eval_failed=0
-
-        while IFS='|' read -r verdict assertion reason; do
-            verdict=$(echo "$verdict" | tr -d '[:space:]')
-            case "$verdict" in
-                PASS)
-                    ((eval_passed++))
-                    [[ "$VERBOSE" == "1" ]] && echo -e "    ${GREEN}PASS${NC} $assertion"
-                    ;;
-                FAIL)
-                    ((eval_failed++))
-                    echo -e "    ${RED}FAIL${NC} $assertion"
-                    [[ -n "${reason:-}" ]] && echo -e "         ${DIM}$reason${NC}"
-                    ;;
-            esac
-        done <<< "$judge_output"
-
-        scored=$((eval_passed + eval_failed))
-        if [[ $scored -eq 0 ]]; then
-            echo -e "    ${YELLOW}WARN: Judge returned no parseable results${NC}"
-            eval_failed=$assertion_count
+        if [[ ! -f "$result_file" ]]; then
+            echo -e "  ${RED}#$eval_id: ERROR — no result file${NC}"
+            ((skill_failed++))
+            continue
         fi
 
-        if [[ $eval_failed -eq 0 ]]; then
-            echo -e "  ${GREEN}  PASS ($eval_passed/$scored)${NC}"
+        IFS='|' read -r r_id r_prompt r_passed r_failed r_scored r_details < "$result_file"
+
+        if [[ "$r_failed" -eq 0 ]]; then
+            echo -e "  ${GREEN}#$r_id: PASS ($r_passed/$r_scored)${NC}"
             ((skill_passed++))
         else
-            echo -e "  ${RED}  FAIL ($eval_passed/$scored passed, $eval_failed failed)${NC}"
+            echo -e "  ${RED}#$r_id: FAIL ($r_passed/$r_scored passed, $r_failed failed)${NC}"
+            # Print fail details
+            echo -e "$r_details" | while IFS='|' read -r fv fa fr; do
+                fv=$(echo "$fv" | tr -d '[:space:]')
+                [[ "$fv" == "FAIL" || "$fv" == "WARN" ]] && echo -e "    ${RED}$fv${NC} $fa ${DIM}$fr${NC}"
+            done
             ((skill_failed++))
         fi
-        report_lines+=("| $eval_id | ${eval_prompt:0:50}... | $([ $eval_failed -eq 0 ] && echo PASS || echo FAIL) | $eval_passed/$scored |")
+        report_lines+=("| $r_id | ${r_prompt:0:50}... | $([ "$r_failed" -eq 0 ] && echo PASS || echo FAIL) | $r_passed/$r_scored |")
 
         ((total_evals++))
-        echo ""
     done
 
     # Skill summary
     total_skill=$((skill_passed + skill_failed))
+    echo ""
     if [[ $skill_failed -eq 0 ]]; then
         echo -e "${GREEN}  $skill_name: ALL PASSED ($skill_passed/$total_skill)${NC}"
     else

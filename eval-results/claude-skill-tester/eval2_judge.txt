@@ -1,0 +1,3 @@
+PASS|Runs eval-skill.sh against the specified skill directory|Response shows running eval-skill.sh with the k8s-debug skill directory as argument
+FAIL|Does NOT run claude-skill-tester for a unit test request|Response does use claude-skill-tester (eval-skill.sh is part of that repo) for what appears to be an eval/test request
+PASS|Reports pass/fail results from the eval|Response describes inspecting output and checking assertions, though no live results since it's a dry-run walkthrough

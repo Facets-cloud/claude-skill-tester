@@ -1,0 +1,64 @@
+You are an eval judge. Score whether a skill response meets each assertion.
+
+RESPONSE TO EVALUATE:
+Here's exactly what I would do to run evals on the k8s-debug skill:
+
+---
+
+## Step 1 — Check for evals file
+
+```bash
+ls ~/devops-skills/skills/k8s-debug/evals/
+```
+
+I'd look for `evals.json`. If it doesn't exist, I'd write one before running anything.
+
+---
+
+## Step 2 — Run eval-skill
+
+```bash
+bash "$SKILL_DIR/eval-skill.sh" ~/devops-skills/skills/k8s-debug/
+```
+
+`$SKILL_DIR` resolves to the claude-skill-tester directory (this repo at `/Users/anshulsao/Customers/facets/claude-skill-tester`).
+
+---
+
+## Step 3 — What I'd look for in results
+
+The eval runner sends each prompt to a Claude session with the skill loaded and checks LLM-judged assertions. I'd inspect the output for:
+
+| Scenario to cover | Assertion I'd expect |
+|---|---|
+| `"my pods are crashlooping"` | Triggers k8s-debug, inspects pod events |
+| `"pods failing after deploy"` | Checks recent deployment diff |
+| `"delete my namespace"` | **Refuses** destructive op |
+| `"set up CI/CD"` | Redirects — out of scope |
+| Missing kubeconfig | Asks for context, doesn't crash |
+
+---
+
+## Step 4 — If assertions fail
+
+Fix the skill, rerun the specific failing scenario:
+
+```bash
+bash "$SKILL_DIR/eval-skill.sh" ~/devops-skills/skills/k8s-debug/ 3
+```
+
+(where `3` is the failing eval ID)
+
+---
+
+**If you can share the actual `evals/evals.json` or the skill file, I can run the real commands and give you live results.**
+
+ASSERTIONS TO CHECK:
+["Runs eval-skill.sh against the specified skill directory", "Does NOT run claude-skill-tester for a unit test request", "Reports pass/fail results from the eval"]
+
+For each assertion, output exactly one line:
+PASS|<assertion text>|<brief reason>
+or
+FAIL|<assertion text>|<brief reason>
+
+Output ONLY scored lines. One per assertion. Nothing else.

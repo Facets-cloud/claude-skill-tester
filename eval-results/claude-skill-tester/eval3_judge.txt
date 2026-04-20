@@ -1,0 +1,4 @@
+PASS|Uses claude-skill-tester for integration testing, not eval-skill|Response uses claude-skill-tester.sh throughout, never mentions eval-skill
+PASS|Sets up the session with the correct working directory|Uses --dir /path/to/aws-cost-leak/ to point at the skill directory
+PASS|Asks or infers the AWS profile to use|Injects AWS_PROFILE=prod and AWS_REGION=us-east-1 as environment variables
+PASS|Sends a natural user prompt to trigger the skill|Uses `say "Find cost leaks in our AWS account"` as the trigger prompt

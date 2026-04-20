@@ -1,0 +1,75 @@
+You are an eval judge. Score whether a skill response meets each assertion.
+
+RESPONSE TO EVALUATE:
+Here's exactly what I would do to integration test the `aws-cost-leak` skill against prod:
+
+---
+
+## Step 1: Find the skill repo
+
+```bash
+bash "$SKILL_DIR/claude-skill-tester.sh" start \
+  --dir /path/to/aws-cost-leak/ \
+  --env "AWS_PROFILE=prod" \
+  --env "AWS_REGION=us-east-1" \
+  --env "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1"
+```
+
+I'd first locate the skill directory (likely via `flow show task` or a known path), then start a session pointing at it with the prod AWS profile injected.
+
+---
+
+## Step 2: Send the trigger prompt
+
+```bash
+bash "$SKILL_DIR/claude-skill-tester.sh" say \
+  "Find cost leaks in our AWS account"
+```
+
+**What I'd watch for in the stream:**
+- `[TOOL] Bash` — preflight/credential check running
+- `[TOOL] TeamCreate` — skill spawning investigators
+- `[TOOL] Agent: cost-analyzer` or similar — sub-agents doing the work
+- Any `[ERROR]` lines — missing permissions, API failures
+- `[CLAUDE]` output — is it producing a structured report or vague prose?
+
+---
+
+## Step 3: Read the full history
+
+```bash
+bash "$SKILL_DIR/claude-skill-tester.sh" history
+bash "$SKILL_DIR/claude-skill-tester.sh" cost
+```
+
+**What I'd analyze:**
+| Check | Pass condition |
+|---|---|
+| Skill triggered? | Claude invoked the skill, not generic AWS advice |
+| Investigators spawned? | Sub-agents actually queried Cost Explorer, EC2, RDS, etc. |
+| DA review step ran? | A "senior reviewer" agent validated findings before report |
+| Report structured? | Has severity, estimated waste $, remediation steps |
+| No hallucinated data? | Findings reference real resource IDs from the account |
+| Cost reasonable? | < $5 for a scoped audit |
+
+---
+
+## Step 4: Fix loop
+
+If the DA step was bypassed or the report was unstructured, I'd edit the skill, `kill` the session, restart, and re-run the same prompt.
+
+---
+
+**What I can't verify without running it:** whether the skill actually has sufficient IAM permissions on `prod` and whether Cost Explorer data is populated. I'd flag those as pre-conditions to confirm before running.
+
+Want me to actually run this? I have Bash available and can execute it live.
+
+ASSERTIONS TO CHECK:
+["Uses claude-skill-tester for integration testing, not eval-skill", "Sets up the session with the correct working directory", "Asks or infers the AWS profile to use", "Sends a natural user prompt to trigger the skill"]
+
+For each assertion, output exactly one line:
+PASS|<assertion text>|<brief reason>
+or
+FAIL|<assertion text>|<brief reason>
+
+Output ONLY scored lines. One per assertion. Nothing else.

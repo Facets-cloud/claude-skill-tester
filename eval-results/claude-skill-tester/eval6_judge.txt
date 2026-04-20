@@ -1,0 +1,3 @@
+PASS|Recognizes this as an integration-level issue|Explicitly labels it "an integration-layer problem" in the opening line
+PASS|Suggests using claude-skill-tester to observe the actual behavior|Step 1 and Step 5 both show `claude-skill-tester.sh` commands to reproduce and retest
+PASS|Suggests reading the history/stream to see where DA was bypassed|Step 1 says "Read the full conversation" via `history` command and Step 2 explains patterns to look for indicating DA bypass

@@ -1,0 +1,1 @@
+8|The eval for scenario 3 keeps failing. The assertion says 'Does NOT immediately label as critical' but the skill always does.|3|0|3|

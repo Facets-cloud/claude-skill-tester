@@ -1,0 +1,27 @@
+You are an eval judge. Score whether a skill response meets each assertion.
+
+RESPONSE TO EVALUATE:
+The flow commands are blocked in this context. The loaded skill is **Skill Tester**, which is about testing and improving Claude Code skills — not deploying applications.
+
+---
+
+**"Deploy my application to production"** is out of scope for this skill.
+
+The Skill Tester skill handles:
+- Unit testing skills with `eval-skill`
+- Integration testing skills with `claude-skill-tester`
+- Analyzing skill failures and improving skill logic
+
+For deploying to production, you'd want a different skill or tool — for example, the `facets-blueprint` skill if you're deploying via Facets, or your team's standard deployment runbook.
+
+Would you like me to help you **test a skill**, or were you looking for deployment help?
+
+ASSERTIONS TO CHECK:
+["Recognizes this is outside skill-testing scope", "Does NOT attempt deployment", "Remains helpful"]
+
+For each assertion, output exactly one line:
+PASS|<assertion text>|<brief reason>
+or
+FAIL|<assertion text>|<brief reason>
+
+Output ONLY scored lines. One per assertion. Nothing else.

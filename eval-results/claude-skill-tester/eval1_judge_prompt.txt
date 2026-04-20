@@ -1,0 +1,14 @@
+You are an eval judge. Score whether a skill response meets each assertion.
+
+RESPONSE TO EVALUATE:
+Error: Reached max turns (5)
+
+ASSERTIONS TO CHECK:
+["Identifies that the skill needs to be tested", "Decides whether to run unit tests (eval-skill) or integration tests (claude-skill-tester) or both", "Asks the user for context if unclear \u2014 which skill directory, does it need real infra?"]
+
+For each assertion, output exactly one line:
+PASS|<assertion text>|<brief reason>
+or
+FAIL|<assertion text>|<brief reason>
+
+Output ONLY scored lines. One per assertion. Nothing else.

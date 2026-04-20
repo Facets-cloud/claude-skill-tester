@@ -1,0 +1,3 @@
+PASS|Understands this is an eval failure indicating a skill behavior problem|Explicitly states "the skill is violating it" and frames it as a bug in the skill
+PASS|Suggests fixing the skill behavior, not the assertion|Directly states "fix the skill, not the assertion" and provides concrete steps to fix skill logic
+PASS|May suggest reading the skill to understand why it labels things as critical prematurely|Step 2 explicitly says "Read the skill itself" and look for premature classification instructions

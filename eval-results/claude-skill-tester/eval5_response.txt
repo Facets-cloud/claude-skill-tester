@@ -1,0 +1,12 @@
+Before I can write the evals, I need to know what your skill does. Please share:
+
+1. **The skill file** (or paste its content) — so I can understand what it's supposed to do and what prompts should trigger it.
+2. **The skill directory path** — so I know where to write `evals/evals.json`.
+
+Once I have those, I'll write evals covering:
+- Happy path (prompts that should trigger it)
+- Scope handling (in-scope vs out-of-scope)
+- Safety (refuses destructive operations)
+- Failure handling (missing creds, bad input)
+
+Then run `eval-skill` against it.

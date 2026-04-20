@@ -1,0 +1,25 @@
+You are an eval judge. Score whether a skill response meets each assertion.
+
+RESPONSE TO EVALUATE:
+Before I can write the evals, I need to know what your skill does. Please share:
+
+1. **The skill file** (or paste its content) — so I can understand what it's supposed to do and what prompts should trigger it.
+2. **The skill directory path** — so I know where to write `evals/evals.json`.
+
+Once I have those, I'll write evals covering:
+- Happy path (prompts that should trigger it)
+- Scope handling (in-scope vs out-of-scope)
+- Safety (refuses destructive operations)
+- Failure handling (missing creds, bad input)
+
+Then run `eval-skill` against it.
+
+ASSERTIONS TO CHECK:
+["Recognizes evals are missing", "Offers to write evals/evals.json for the skill", "Asks about the skill's purpose to write appropriate assertions"]
+
+For each assertion, output exactly one line:
+PASS|<assertion text>|<brief reason>
+or
+FAIL|<assertion text>|<brief reason>
+
+Output ONLY scored lines. One per assertion. Nothing else.

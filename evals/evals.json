@@ -1,0 +1,78 @@
+{
+  "skill_name": "test-skill",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Test my aws-network-exposure skill.",
+      "assertions": [
+        "Identifies that the skill needs to be tested",
+        "Decides whether to run unit tests (eval-skill) or integration tests (claude-skill-tester) or both",
+        "Asks the user for context if unclear — which skill directory, does it need real infra?"
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "Run evals on the k8s-debug skill in ~/devops-skills/skills/k8s-debug/",
+      "assertions": [
+        "Runs eval-skill.sh against the specified skill directory",
+        "Does NOT run claude-skill-tester for a unit test request",
+        "Reports pass/fail results from the eval"
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "Integration test the aws-cost-leak skill against our prod AWS account.",
+      "assertions": [
+        "Uses claude-skill-tester for integration testing, not eval-skill",
+        "Sets up the session with the correct working directory",
+        "Asks or infers the AWS profile to use",
+        "Sends a natural user prompt to trigger the skill"
+      ]
+    },
+    {
+      "id": 4,
+      "prompt": "My skill isn't triggering when users say 'check my network'. Can you test why?",
+      "assertions": [
+        "Recognizes this as a trigger/activation problem",
+        "Suggests running eval-skill to test if the prompt triggers the skill",
+        "Does NOT immediately jump to integration testing"
+      ]
+    },
+    {
+      "id": 5,
+      "prompt": "I just wrote a new skill. It doesn't have evals yet.",
+      "assertions": [
+        "Recognizes evals are missing",
+        "Offers to write evals/evals.json for the skill",
+        "Asks about the skill's purpose to write appropriate assertions"
+      ]
+    },
+    {
+      "id": 6,
+      "prompt": "The DA keeps getting skipped in my skill. How do I fix it?",
+      "assertions": [
+        "Recognizes this as an integration-level issue",
+        "Suggests using claude-skill-tester to observe the actual behavior",
+        "Suggests reading the history/stream to see where DA was bypassed"
+      ]
+    },
+    {
+      "id": 7,
+      "prompt": "Deploy my application to production.",
+      "assertions": [
+        "Recognizes this is outside skill-testing scope",
+        "Does NOT attempt deployment",
+        "Remains helpful"
+      ]
+    },
+    {
+      "id": 8,
+      "prompt": "The eval for scenario 3 keeps failing. The assertion says 'Does NOT immediately label as critical' but the skill always does.",
+      "assertions": [
+        "Understands this is an eval failure indicating a skill behavior problem",
+        "Suggests fixing the skill behavior, not the assertion",
+        "May suggest reading the skill to understand why it labels things as critical prematurely"
+      ]
+    }
+  ]
+}

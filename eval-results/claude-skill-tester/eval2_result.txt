@@ -1,0 +1,1 @@
+2|Run evals on the k8s-debug skill in ~/devops-skills/skills/k8s-debug/|2|1|3|FAIL|Does NOT run claude-skill-tester for a unit test request|Response does use claude-skill-tester (eval-skill.sh is part of that repo) for what appears to be an eval/test request\n
